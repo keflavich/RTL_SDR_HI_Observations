@@ -17,7 +17,10 @@ def get_1420psd():
             fh.write(response.text)
 
 def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
-                       observatory_latitude=29.6, sleep_time=120, username='student'):
+                       observatory_latitude=29.6,
+                       obs_type='',
+                       freqcorr=60,
+                       sleep_time=120, username='student'):
     """
     Record a single integration
 
@@ -32,6 +35,13 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     observatory_latitude : float
     observatory_longitude : float
         Coordinates of the observatory (default: Gainesville)
+    obs_type : str
+        The observation type.  This will be appended to the filename,
+        so make sure it's descriptive enough and does not include any
+        spaces or non-ascii characters.
+    freqcorr : int
+        The frequency correction factor.  This value needs to be calibrated
+        for each individual RTL-SDR.  Default is 60, but may be wrong!
     sleep_time : int, seconds
         The amount of time to sleep in the case that the USB dongle is
         unresponsive.  If this case comes up often, you may need to unplug the
@@ -51,7 +61,8 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                              f'--obs_lat={observatory_latitude}',
                              f'--altitude={altitude}',
                              f'--azimuth={azimuth}',
-                             '--freqcorr=60'])
+                             f'--suffix={obstype}',
+                             f'--freqcorr={freqcorr}'])
     # wait for  the integration to complete
     time.sleep(tint)
     print(datetime.datetime.now())
