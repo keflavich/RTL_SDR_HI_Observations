@@ -2,10 +2,22 @@ import time
 import datetime
 import subprocess
 import sys
+import os
 
+def get_1420psd():
+    print("Downloading the 1420psd.py script.  This will run only once, "
+          "but requires an internet connection.  If you're not connected "
+          "to the internet, either find the script and put it in the "
+          f"current directory ({os.getcwd()}) or connect.")
+    if not os.path.exists('1420psd.py'):
+        import requests
+        response = requests.get('https://raw.githubusercontent.com/keflavich/1420SDR/master/1420_psd.py')
+        response.raise_for_status()
+        with open('1420psd.py', 'w') as fh:
+            fh.write(response.text)
 
 def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
-                       observatory_latitude=29.6, sleep_time=120):
+                       observatory_latitude=29.6, sleep_time=120, username='student'):
     """
     Record a single integration
 
@@ -26,7 +38,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         dongle and let it cool
     """
 
-    response = subprocess.call([r'C:\Users\gluner\Anaconda3\Library\bin\bias_tee_on.bat'])
+    response = subprocess.call([rf'C:\Users\{username}\Anaconda3\Library\bin\bias_tee_on.bat'])
     if response != 0:
         raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
                       f"Error value was {response}")
@@ -52,7 +64,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         print(f"The RTL-SDR failed to respond, so we're turning it off and waiting {sleep_time} seconds.")
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
-        response = subprocess.call([r'C:\Users\gluner\Anaconda3\Library\bin\bias_tee_off.bat'])
+        response = subprocess.call([r'C:\Users\{username}\Anaconda3\Library\bin\bias_tee_off.bat'])
         if response != 0:
             raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
                           f"Error value was {response}")
