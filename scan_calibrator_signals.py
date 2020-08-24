@@ -7,16 +7,24 @@ noaa_freqs = [162.400, 162.425, 162.450, 162.475, 162.500, 162.525, 162.550]*u.M
 #https://www.weather.gov/nwr/stations?State=FL
 noaa_freq = 162.475*u.MHz
 
-def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=2.4*u.MHz,
-                      passes=10, max_offset=1e-3):
+def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u.MHz,
+                      passes=20, max_offset=1000, default_offset=325):
+    """
+    """
 
     sdr = RtlSdr(device_index=device_index)
     try:
         sdr.sample_rate = bandwidth.to(u.Hz).value
         sdr.gain = 15
         numsamples = 2048*4
+        sdr.center_freq = calibrator_freq.to(u.Hz).value
 
         assert sdr.get_freq_correction() == 0
+
+        if default_offset != 0:
+            sdr.set_freq_correction(default_offset)
+
+        foff = sdr.get_freq_correction()
 
         pses = []
 
@@ -37,7 +45,7 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=2.4*u
 
         mean_ps = np.mean(pses, axis=0)
 
-        frequency = u.Quantity(sdr.fc+sdr.rs*frq[idx], u.Hz)
+        frequency = u.Quantity(sdr.fc*(1-foff/1e6) + sdr.rs*frq[idx], u.Hz)
         print()
         print(f"sdr.fc={sdr.fc}, sdr.center_freq={sdr.center_freq}")
 
