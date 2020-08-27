@@ -86,6 +86,6 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         time.sleep(sleep_time)
         print(f"Resuming integration at {datetime.datetime.now()}")
 
-    print(outs, errs)
+    print(f"outputs={outs}, errors={errs}")
 
     return outs, errs
