@@ -78,7 +78,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         print(f"The RTL-SDR failed to respond, so we're turning it off and waiting {sleep_time} seconds.")
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
-        response = subprocess.call([r'{anaconda_path}\Library\bin\bias_tee_off.bat'])
+        response = subprocess.call([rf'{anaconda_path}\Library\bin\bias_tee_off.bat'])
         if response != 0:
             raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
                           f"Error value was {response}")
