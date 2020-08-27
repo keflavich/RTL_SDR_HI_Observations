@@ -23,7 +23,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        sleep_time_factor=2,
                        #anaconda_path='C:\\ProgramData\\Anaconda3\\',
                        verbose=False,
-                       timeout_factor=1.1,
+                       timeout_factor=2.1,
                       ):
     """
     Record a single integration
@@ -52,9 +52,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         comes up often, you may need to unplug the dongle and let it cool
     timeout_factor : float
         When running an integration, how much longer than the integration time
-        should you wait before killing the task?  Usually 10% overhead is
+        should you wait before killing the task?  Usually 2.1x overhead is
         enough, but if you get a lot of timeout errors, try going up as
-        high as 50% (1.5x).
+        high as 3.0x.
     verbose : bool
         Should the integration command be verbose?
     """
