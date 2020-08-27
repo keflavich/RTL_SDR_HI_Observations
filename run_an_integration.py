@@ -22,7 +22,8 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        freqcorr=60,
                        sleep_time_factor=2,
                        anaconda_path='C:\\ProgramData\\Anaconda3\\',
-                       verbose=False
+                       verbose=False,
+                       timeout_factor=1.1,
                       ):
     """
     Record a single integration
@@ -49,6 +50,11 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         The amount of time to sleep in the case that the USB dongle is
         unresponsive is set to (tint) * (sleep_time_factor).  If this case
         comes up often, you may need to unplug the dongle and let it cool
+    timeout_factor : float
+        When running an integration, how much longer than the integration time
+        should you wait before killing the task?  Usually 10% overhead is
+        enough, but if you get a lot of timeout errors, try going up as
+        high as 50% (1.5x).
     verbose : bool
         Should the integration command be verbose?
     """
@@ -72,7 +78,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     # https://github.com/keflavich/1420SDR/blob/master/1420_psd.py
     proc = subprocess.Popen([sys.executable, '1420_psd.py'] + arguments)
     # wait for  the integration to complete
-    time.sleep(tint)
+    time.sleep(tint * timeout_factor)
     print(datetime.datetime.now())
 
     try:
@@ -90,8 +96,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                           f"Error value was {response}")
 
         time.sleep(sleep_time)
-        print(f"Resuming integration at {datetime.datetime.now()}")
+        print(f"Returning control to the terminal at {datetime.datetime.now()}")
 
-    print(f"outputs={outs}, errors={errs}")
+    if verbose:
+        print(f"outputs={outs}, errors={errs}")
 
     return outs, errs
