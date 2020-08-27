@@ -25,6 +25,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        verbose=False,
                        timeout_factor=2.1,
                        skip_bias_tee=False,
+                       bias_tee_timeout=0.1,
                       ):
     """
     Record a single integration
@@ -71,10 +72,12 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     bias_tee_path = os.path.join(binpath, 'rtl_biast')
 
     response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', '1'])
-    if response.poll() != 0 and not skip_bias_tee:
+    return_code = response.wait(timeout=bias_tee_timeout)
+
+    if return_code != 0 and not skip_bias_tee:
         raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
                       f"Error value was {response}")
-    elif response.poll() != 0:
+    elif return_code != 0:
         response.kill()
 
     arguments = ['-i', str(tint),
@@ -105,10 +108,11 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
         response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', '0'])
-        if response.poll() != 0 and not skip_bias_tee:
+        return_code = response.wait(timeout=bias_tee_timeout)
+        if return_code != 0 and not skip_bias_tee:
             raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
                           f"Error value was {response}")
-        elif response.poll() != 0:
+        elif return_code != 0:
             response.kill()
 
         time.sleep(sleep_time)
