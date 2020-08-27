@@ -4,12 +4,12 @@ import subprocess
 import sys
 import os
 
-def get_1420psd():
+def get_1420psd(overwrite=False):
     print("Downloading the 1420psd.py script.  This will run only once, "
           "but requires an internet connection.  If you're not connected "
           "to the internet, either find the script and put it in the "
           f"current directory ({os.getcwd()}) or connect.")
-    if not os.path.exists('1420psd.py'):
+    if overwrite or not os.path.exists('1420_psd.py'):
         import requests
         response = requests.get('https://raw.githubusercontent.com/keflavich/1420SDR/master/1420_psd.py')
         response.raise_for_status()
