@@ -21,7 +21,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        obs_type='',
                        freqcorr=60,
                        sleep_time_factor=2,
-                       anaconda_path='C:\\ProgramData\\Anaconda3\\',
+                       #anaconda_path='C:\\ProgramData\\Anaconda3\\',
                        verbose=False,
                        timeout_factor=1.1,
                       ):
@@ -58,6 +58,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     verbose : bool
         Should the integration command be verbose?
     """
+    anaconda_path = os.path.split(sys.executable)[0]
 
     response = subprocess.call([rf'{anaconda_path}\Library\bin\bias_tee_on.bat'])
     if response != 0:

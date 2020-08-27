@@ -37,4 +37,6 @@ and in a new cell, replacing <USERNAME> appropriately,
   assert 0 == subprocess.call([r'C:\Users\<USERNAME>\Anaconda3\Library\bin\bias_tee_on.bat'])
 ```
 
-The LNA light should stay illuminated and a plot should appear.  If you get a USB -12 error message, try changing the device ID (e.g., --device=1).  You can use `rtl_tcp` from powershell to see a list of devices
+The LNA light should stay illuminated and a plot should appear.
+If you get a USB -12 error message, try changing the device ID (e.g., --device=1).
+You can use `rtl_tcp` from powershell to see a list of devices
