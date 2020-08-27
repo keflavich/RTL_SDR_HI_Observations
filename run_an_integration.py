@@ -21,7 +21,8 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        obs_type='',
                        freqcorr=60,
                        sleep_time_factor=2,
-                       anaconda_path='C:\\ProgramData\\Anaconda3\\'
+                       anaconda_path='C:\\ProgramData\\Anaconda3\\',
+                       verbose=False
                       ):
     """
     Record a single integration
@@ -48,6 +49,8 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         The amount of time to sleep in the case that the USB dongle is
         unresponsive is set to (tint) * (sleep_time_factor).  If this case
         comes up often, you may need to unplug the dongle and let it cool
+    verbose : bool
+        Should the integration command be verbose?
     """
 
     response = subprocess.call([rf'{anaconda_path}\Library\bin\bias_tee_on.bat'])
@@ -55,16 +58,19 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
                       f"Error value was {response}")
 
+    arguments = ['-i', str(tint),
+                 '--do_fsw',
+                 f'--obs_lon={observatory_longitude}',
+                 f'--obs_lat={observatory_latitude}',
+                 f'--altitude={altitude}',
+                 f'--azimuth={azimuth}',
+                 f'--suffix={obs_type}',
+                 f'--freqcorr={freqcorr}']
+    if verbose:
+        arguments.append('--verbose')
+
     # https://github.com/keflavich/1420SDR/blob/master/1420_psd.py
-    proc = subprocess.Popen([sys.executable,
-                            '1420_psd.py', '-i', str(tint),
-                             '--do_fsw',
-                             f'--obs_lon={observatory_longitude}',
-                             f'--obs_lat={observatory_latitude}',
-                             f'--altitude={altitude}',
-                             f'--azimuth={azimuth}',
-                             f'--suffix={obs_type}',
-                             f'--freqcorr={freqcorr}'])
+    proc = subprocess.Popen([sys.executable, '1420_psd.py'] + arguments)
     # wait for  the integration to complete
     time.sleep(tint)
     print(datetime.datetime.now())
