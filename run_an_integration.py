@@ -20,7 +20,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        observatory_latitude=29.6,
                        obs_type='',
                        freqcorr=60,
-                       sleep_time=120, username='student'):
+                       sleep_time_factor=2,
+                       anaconda_path='C:\\ProgramData\\Anaconda3\\'
+                      ):
     """
     Record a single integration
 
@@ -42,13 +44,13 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     freqcorr : int
         The frequency correction factor.  This value needs to be calibrated
         for each individual RTL-SDR.  Default is 60, but may be wrong!
-    sleep_time : int, seconds
+    sleep_time_factor : int
         The amount of time to sleep in the case that the USB dongle is
-        unresponsive.  If this case comes up often, you may need to unplug the
-        dongle and let it cool
+        unresponsive is set to (tint) * (sleep_time_factor).  If this case
+        comes up often, you may need to unplug the dongle and let it cool
     """
 
-    response = subprocess.call([rf'C:\Users\{username}\Anaconda3\Library\bin\bias_tee_on.bat'])
+    response = subprocess.call([rf'{anaconda_path}\Library\bin\bias_tee_on.bat'])
     if response != 0:
         raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
                       f"Error value was {response}")
@@ -61,7 +63,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                              f'--obs_lat={observatory_latitude}',
                              f'--altitude={altitude}',
                              f'--azimuth={azimuth}',
-                             f'--suffix={obstype}',
+                             f'--suffix={obs_type}',
                              f'--freqcorr={freqcorr}'])
     # wait for  the integration to complete
     time.sleep(tint)
@@ -72,13 +74,18 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     except subprocess.TimeoutExpired:
         proc.kill()
         outs, errs = proc.communicate()
+        sleep_time = sleep_time_factor * tint
         print(f"The RTL-SDR failed to respond, so we're turning it off and waiting {sleep_time} seconds.")
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
-        response = subprocess.call([r'C:\Users\{username}\Anaconda3\Library\bin\bias_tee_off.bat'])
+        response = subprocess.call([r'{anaconda_path}\Library\bin\bias_tee_off.bat'])
         if response != 0:
             raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
                           f"Error value was {response}")
 
         time.sleep(sleep_time)
         print(f"Resuming integration at {datetime.datetime.now()}")
+
+    print(outs)
+
+    return outs, errs
