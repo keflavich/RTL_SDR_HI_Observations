@@ -25,7 +25,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        verbose=False,
                        timeout_factor=2.1,
                        skip_bias_tee=False,
-                       bias_tee_timeout=0.1,
+                       bias_tee_timeout=2,
                       ):
     """
     Record a single integration
@@ -61,6 +61,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         should you wait before killing the task?  Usually 2.1x overhead is
         enough, but if you get a lot of timeout errors, try going up as
         high as 3.0x.
+    bias_tee_timeout : float
+        Amount of time to wait for the bias tee to turn on.  If you get bias
+        tee timeout errors, increase this value.
     skip_bias_tee : bool
         Skip the bias tee steps?  Don't do this if you're taking real data
         of HI, but it can be useful for debugging.
