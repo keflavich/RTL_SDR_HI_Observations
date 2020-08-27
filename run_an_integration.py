@@ -67,8 +67,8 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         Should the integration command be verbose?
     """
     anaconda_path = os.path.split(sys.executable)[0]
-    binpath = os.path.join([anaconda_path, 'Library', 'bin'])
-    bias_tee_path = os.path.join([binpath, 'rtl_biast'])
+    binpath = os.path.join(anaconda_path, 'Library', 'bin')
+    bias_tee_path = os.path.join(binpath, 'rtl_biast')
 
     response = subprocess.call([bias_tee_path, '-d', str(device_index), '-b', '1'])
     if response != 0 and not skip_bias_tee:
