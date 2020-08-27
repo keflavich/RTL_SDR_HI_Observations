@@ -24,6 +24,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        #anaconda_path='C:\\ProgramData\\Anaconda3\\',
                        verbose=False,
                        timeout_factor=2.1,
+                       skip_bias_tee=False,
                       ):
     """
     Record a single integration
@@ -55,13 +56,16 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         should you wait before killing the task?  Usually 2.1x overhead is
         enough, but if you get a lot of timeout errors, try going up as
         high as 3.0x.
+    skip_bias_tee : bool
+        Skip the bias tee steps?  Don't do this if you're taking real data
+        of HI, but it can be useful for debugging.
     verbose : bool
         Should the integration command be verbose?
     """
     anaconda_path = os.path.split(sys.executable)[0]
 
     response = subprocess.call([rf'{anaconda_path}\Library\bin\bias_tee_on.bat'])
-    if response != 0:
+    if response != 0 and not skip_bias_tee:
         raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
                       f"Error value was {response}")
 
@@ -92,7 +96,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
         response = subprocess.call([rf'{anaconda_path}\Library\bin\bias_tee_off.bat'])
-        if response != 0:
+        if response != 0 and not skip_bias_tee:
             raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
                           f"Error value was {response}")
 
