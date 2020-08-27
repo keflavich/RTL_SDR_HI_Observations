@@ -13,7 +13,7 @@ def get_1420psd():
         import requests
         response = requests.get('https://raw.githubusercontent.com/keflavich/1420SDR/master/1420_psd.py')
         response.raise_for_status()
-        with open('1420psd.py', 'w') as fh:
+        with open('1420_psd.py', 'w') as fh:
             fh.write(response.text)
 
 def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
