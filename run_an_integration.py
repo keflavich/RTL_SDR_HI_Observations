@@ -21,7 +21,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        obs_type='',
                        freqcorr=60,
                        sleep_time_factor=2,
-                       #anaconda_path='C:\\ProgramData\\Anaconda3\\',
+                       device_index=0,
                        verbose=False,
                        timeout_factor=2.1,
                        skip_bias_tee=False,
@@ -47,6 +47,10 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     freqcorr : int
         The frequency correction factor.  This value needs to be calibrated
         for each individual RTL-SDR.  Default is 60, but may be wrong!
+    device_index : int
+        The device index number.  Generally should be zero, but if you get
+        errors saying the device is unresponsive (USB error 12, for example),
+        try setting this to be 1.
     sleep_time_factor : int
         The amount of time to sleep in the case that the USB dongle is
         unresponsive is set to (tint) * (sleep_time_factor).  If this case
@@ -74,6 +78,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                  f'--obs_lon={observatory_longitude}',
                  f'--obs_lat={observatory_latitude}',
                  f'--altitude={altitude}',
+                 f'--device_index={device_index}',
                  f'--azimuth={azimuth}',
                  f'--suffix={obs_type}',
                  f'--freqcorr={freqcorr}']
