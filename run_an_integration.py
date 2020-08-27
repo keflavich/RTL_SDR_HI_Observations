@@ -70,10 +70,12 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     binpath = os.path.join(anaconda_path, 'Library', 'bin')
     bias_tee_path = os.path.join(binpath, 'rtl_biast')
 
-    response = subprocess.call([bias_tee_path, '-d', str(device_index), '-b', '1'])
-    if response != 0 and not skip_bias_tee:
+    response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', '1'])
+    if response.poll() != 0 and not skip_bias_tee:
         raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
                       f"Error value was {response}")
+    elif response.poll() != 0:
+        response.kill()
 
     arguments = ['-i', str(tint),
                  '--do_fsw',
@@ -102,10 +104,12 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         print(f"The RTL-SDR failed to respond, so we're turning it off and waiting {sleep_time} seconds.")
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
-        response = subprocess.call([bias_tee_path, '-d', str(device_index), '-b', '0'])
-        if response != 0 and not skip_bias_tee:
+        response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', '0'])
+        if response.poll() != 0 and not skip_bias_tee:
             raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
                           f"Error value was {response}")
+        elif response.poll() != 0:
+            response.kill()
 
         time.sleep(sleep_time)
         print(f"Returning control to the terminal at {datetime.datetime.now()}")
