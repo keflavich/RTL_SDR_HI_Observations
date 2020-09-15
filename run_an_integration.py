@@ -16,6 +16,46 @@ def get_1420psd(overwrite=False):
         with open('1420_psd.py', 'w') as fh:
             fh.write(response.text)
 
+def determine_path(possible_users=['student', 'lab-admin',]):
+    anaconda_path = os.path.split(sys.executable)[0]
+    binpath = os.path.join(anaconda_path, 'Library', 'bin')
+    bias_tee_path = os.path.join(binpath, 'rtl_biast')
+
+    if os.path.exists(bias_tee_path):
+        return binpath
+    else:
+        root = os.path.abspath(os.sep)
+        for username in possible_users:
+            for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda'):
+                binpath = os.path.join(root, 'Users', username, anacondapath, 'Library', 'bin')
+                bias_tee_path = os.path.join(binpath, 'rtl_biast')
+                if os.path.exists(bias_tee_path):
+                    return binpath
+
+    raise IOError("rtl_biast wasn't found in any of the search directories!  "
+                  "Maybe it's not installed?")
+
+def bias_tee(device_index=0, bias_tee_timeout=2, skip_bias_tee=False, state=1):
+    binpath = determine_path()
+    bias_tee_path = os.path.join(binpath, 'rtl_biast')
+
+    response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', str(state)])
+    return_code = response.wait(timeout=bias_tee_timeout)
+
+    if return_code != 0 and not skip_bias_tee:
+        raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
+                      f"Error value was {response}")
+    elif return_code != 0:
+        response.kill()
+
+    return return_code
+
+def bias_tee_on(**kwargs):
+    return bias_tee(state=1, **kwargs)
+
+def bias_tee_off(**kwargs):
+    return bias_tee(state=0, **kwargs)
+
 def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                        observatory_latitude=29.6,
                        obs_type='',
@@ -70,18 +110,10 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     verbose : bool
         Should the integration command be verbose?
     """
-    anaconda_path = os.path.split(sys.executable)[0]
-    binpath = os.path.join(anaconda_path, 'Library', 'bin')
-    bias_tee_path = os.path.join(binpath, 'rtl_biast')
 
-    response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', '1'])
-    return_code = response.wait(timeout=bias_tee_timeout)
+    bias_tee_on(device_index=device_index, bias_tee_timeout=bias_tee_timeout,
+                skip_bias_tee=skip_bias_tee)
 
-    if return_code != 0 and not skip_bias_tee:
-        raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) on.  "
-                      f"Error value was {response}")
-    elif return_code != 0:
-        response.kill()
 
     arguments = ['-i', str(tint),
                  '--do_fsw',
@@ -110,13 +142,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         print(f"The RTL-SDR failed to respond, so we're turning it off and waiting {sleep_time} seconds.")
         print(f"Killed task at {datetime.datetime.now()}.")
         print(f"outs={outs}, errs={errs}")
-        response = subprocess.Popen([bias_tee_path, '-d', str(device_index), '-b', '0'])
-        return_code = response.wait(timeout=bias_tee_timeout)
-        if return_code != 0 and not skip_bias_tee:
-            raise IOError("Failed to turn the bias tee (the thing that powers the low-noise amplifier (LNA)) off.  "
-                          f"Error value was {response}")
-        elif return_code != 0:
-            response.kill()
+        bias_tee_off(device_index=device_index,
+                     bias_tee_timeout=bias_tee_timeout,
+                     skip_bias_tee=skip_bias_tee)
 
         time.sleep(sleep_time)
         print(f"Returning control to the terminal at {datetime.datetime.now()}")
