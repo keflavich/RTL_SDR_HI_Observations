@@ -128,6 +128,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
         arguments.append('--verbose')
 
     # https://github.com/keflavich/1420SDR/blob/master/1420_psd.py
+    if not os.path.exists('1420_psd.py'):
+        get_1420psd()
+
     proc = subprocess.Popen([sys.executable, '1420_psd.py'] + arguments)
     # wait for  the integration to complete
     time.sleep(tint * timeout_factor)
