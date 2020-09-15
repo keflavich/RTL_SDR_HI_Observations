@@ -16,7 +16,7 @@ def get_1420psd(overwrite=False):
         with open('1420_psd.py', 'w') as fh:
             fh.write(response.text)
 
-def determine_path(possible_users=['student', 'lab-admin',]):
+def determine_path(possible_users=['student', 'lab-admin', 'lab', 'Public', 'admina']):
     anaconda_path = os.path.split(sys.executable)[0]
     binpath = os.path.join(anaconda_path, 'Library', 'bin')
     bias_tee_path = os.path.join(binpath, 'rtl_biast')
@@ -29,7 +29,7 @@ def determine_path(possible_users=['student', 'lab-admin',]):
             for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda'):
                 binpath = os.path.join(root, 'Users', username, anacondapath, 'Library', 'bin')
                 bias_tee_path = os.path.join(binpath, 'rtl_biast')
-                if os.path.exists(bias_tee_path):
+                if os.path.exists(bias_tee_path) or os.path.exists(bias_tee_path+".exe"):
                     return binpath
 
     raise IOError("rtl_biast wasn't found in any of the search directories!  "
