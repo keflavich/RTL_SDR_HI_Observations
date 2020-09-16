@@ -38,6 +38,7 @@ assert os.path.isfile(tee_on)
 
 assert find_library('librtlsdr'),"Installation failed."
 assert find_library('librtlsdr.dll'),"Installation failed."
+print("path to librtlsdr = {}".format(find_library('librtlsdr')))
 
 assert subprocess.call([str(tee_on)]) == 0
 print(tee_on)

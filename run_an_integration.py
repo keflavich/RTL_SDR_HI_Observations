@@ -31,6 +31,12 @@ def determine_path(possible_users=['student', 'lab-admin', 'lab', 'Public', 'adm
                 bias_tee_path = os.path.join(binpath, 'rtl_biast')
                 if os.path.exists(bias_tee_path) or os.path.exists(bias_tee_path+".exe"):
                     return binpath
+        for basepath in ('ProgramData',):
+            for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda'):
+                binpath = os.path.join(root, basepath, anacondapath, 'Library', 'bin')
+                bias_tee_path = os.path.join(binpath, 'rtl_biast')
+                if os.path.exists(bias_tee_path) or os.path.exists(bias_tee_path+".exe"):
+                    return binpath
 
     raise IOError("rtl_biast wasn't found in any of the search directories!  "
                   "Maybe it's not installed?")
@@ -110,6 +116,9 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     verbose : bool
         Should the integration command be verbose?
     """
+
+    # if this doesn't work, there's an installation problem
+    import rtlsdr
 
     bias_tee_on(device_index=device_index, bias_tee_timeout=bias_tee_timeout,
                 skip_bias_tee=skip_bias_tee)
