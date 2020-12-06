@@ -132,9 +132,11 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
                  f'--device_index={device_index}',
                  f'--azimuth={azimuth}',
                  f'--suffix={obs_type}',
-                 f'--freqcorr={freqcorr}']
+                 f'--freqcorr={int(freqcorr)}']
     if verbose:
         arguments.append('--verbose')
+
+        print(" ".join([sys.executable, '1420_psd.py'] + arguments))
 
     # https://github.com/keflavich/1420SDR/blob/master/1420_psd.py
     if not os.path.exists('1420_psd.py'):

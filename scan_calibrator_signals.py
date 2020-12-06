@@ -39,7 +39,7 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
 
             ps = np.abs(np.fft.fft(samples))**2
             # this seems to be an unneeded hack
-            #ps[0] = np.mean(ps)
+            ps[0] = np.mean(ps)
             pses.append(ps[idx])
 
             print(".", end='')
