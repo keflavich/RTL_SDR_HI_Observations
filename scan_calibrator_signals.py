@@ -10,6 +10,29 @@ noaa_freq = 162.475*u.MHz
 def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u.MHz,
                       passes=20, max_offset=1000, default_offset=325):
     """
+    Calibrate the RTL-SDR using a known NOAA weather station.
+
+    Parameters
+    ----------
+    device_index : int
+        The USB ID of the device.  Usually 0, sometimes 1.
+    calibrator_freq : Quantity, MHz
+        The frequency of the weather station.  The active one in Gainesville is
+        preselected.
+    bandwidth : Quantity, MHz
+        The bandwidth of the observation to obtain.  Generally limited to <2.4
+        MHz.  Will be used to set the sample rate of the SDR.
+    passes : int
+        Number of passes (single-integrations) to average prior to measuring
+        the offset
+    max_offset : int
+        The maximum offset to search for, in parts-per-million.  This is set
+        to avoid possibly detecting other (RFI) signals in-band
+    default_offset : int
+        The default offset to use when measuring the frequency offset.  A
+        nonzero offset is needed to avoid having the signal channel landing on
+        the central DC channel, which generally does not have a good
+        measurement
     """
 
     sdr = RtlSdr(device_index=device_index)
@@ -39,6 +62,7 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
 
             ps = np.abs(np.fft.fft(samples))**2
             # this seems to be an unneeded hack
+            # (but it might help avoid a spike at 0-offset?)
             ps[0] = np.mean(ps)
             pses.append(ps[idx])
 
