@@ -3,7 +3,7 @@ Set up a new computer with the software needed for RLT-SDR HI observations.  The
 1. Follow instructions at https://www.rtl-sdr.com/rtl-sdr-quick-start-guide/ through step 13
    * I did not need step 2
    * step 13 is a verification step
-2. Download & extract https://github.com/rtlsdrblog/rtl-sdr/releases/tag/v1.1 -> https://github.com/rtlsdrblog/rtl-sdr/releases/download/v1.1/bt_driver.zip
+2. Download & extract https://github.com/rtlsdrblog/rtl-sdr/releases/tag/v1.1 -> https://github.com/rtlsdrblog/rtl-sdr/releases/download/v1.1/bt_driver.zip.  The .dll files should end up in a bin/ directory (e.g., the anaconda/bin directory on Windows)
 3. Download and install the x86 version of the 2010 release of vcredist from https://www.microsoft.com/en-us/download/details.aspx?id=26999
 4. Plug in the rltsdr and connect the LNA
 5. Run the `bias_tee_on` script
