@@ -144,7 +144,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
 
     t0 = time.time()
 
-    proc = subprocess.Popen([sys.executable, '1420_psd.py'] + arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    proc = subprocess.Popen([sys.executable, '1420_psd.py'] + arguments, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     # wait for  the integration to complete
     time.sleep(tint) #* timeout_factor)
     print(datetime.datetime.now())
