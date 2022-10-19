@@ -150,7 +150,7 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     print(datetime.datetime.now())
 
     success = False
-        while not success:
+    while not success:
         try:
             outs, errs = proc.communicate(timeout=tint)
             success = True
