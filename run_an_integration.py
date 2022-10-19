@@ -142,14 +142,25 @@ def record_integration(altitude, azimuth, tint, observatory_longitude=-82.3,
     if not os.path.exists('1420_psd.py'):
         get_1420psd()
 
+    t0 = time.time()
+
     proc = subprocess.Popen([sys.executable, '1420_psd.py'] + arguments)
     # wait for  the integration to complete
-    time.sleep(tint * timeout_factor)
+    time.sleep(tint) #* timeout_factor)
     print(datetime.datetime.now())
 
-    try:
-        outs, errs = proc.communicate(timeout=tint)
-    except subprocess.TimeoutExpired:
+    success = False
+        while not success:
+        try:
+            outs, errs = proc.communicate(timeout=tint)
+            success = True
+        except subprocess.TimeoutExpired:
+            if time.time() - t0 > tint * timeout_factor:
+                print("Wait time {time.time() - t0} exceeded {tint * timeout_factor}.  Cancelling.")
+                break
+            continue
+
+    if not success:
         proc.kill()
         outs, errs = proc.communicate()
         sleep_time = sleep_time_factor * tint
