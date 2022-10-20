@@ -8,7 +8,7 @@ noaa_freqs = [162.400, 162.425, 162.450, 162.475, 162.500, 162.525, 162.550]*u.M
 noaa_freq = 162.475*u.MHz
 
 def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u.MHz,
-                      passes=20, max_offset=1000, default_offset=325):
+                      passes=20, max_offset=300, default_offset=325):
     """
     Calibrate the RTL-SDR using a known NOAA weather station.
 
@@ -27,7 +27,9 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
         the offset
     max_offset : int
         The maximum offset to search for, in parts-per-million.  This is set
-        to avoid possibly detecting other (RFI) signals in-band
+        to avoid possibly detecting other (RFI) signals in-band.  Generally
+        you want this to be less than the default_offset to avoid the "total power"
+        spike at the center.
     default_offset : int
         The default offset to use when measuring the frequency offset.  A
         nonzero offset is needed to avoid having the signal channel landing on
@@ -74,8 +76,8 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
         print()
         print(f"sdr.fc={sdr.fc}, sdr.center_freq={sdr.center_freq}")
 
-        cutout = ((frequency > calibrator_freq*(1-max_offset)) &
-                  (frequency < calibrator_freq*(1+max_offset)))
+        cutout = ((frequency > calibrator_freq*(1-max_offset/1e6)) &
+                  (frequency < calibrator_freq*(1+max_offset/1e6)))
 
         max_ind = np.argmax(mean_ps[cutout])
         meas_freq = frequency[cutout][max_ind]
