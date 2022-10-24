@@ -1,3 +1,6 @@
+"""
+Install script for windows
+"""
 import pkgutil
 from pathlib import Path
 import sys
@@ -26,13 +29,14 @@ response.raise_for_status()
 zf = zipfile.ZipFile(BytesIO(response.content))
 zf.extractall(binpath, members=[x for x in zf.namelist() if 'dll' in x])
 zf.extractall(dllpath, members=[x for x in zf.namelist() if 'dll' in x])
-print("Extracted ",[x for x in zf.namelist() if 'dll' in x])
+print(f"Extracted {[x for x in zf.namelist() if 'dll' in x]} into both {binpath} and {dllpath}")
 
 
 response = requests.get('https://github.com/rtlsdrblog/rtl-sdr/releases/download/v1.1/bt_driver.zip')
 response.raise_for_status()
 zf = zipfile.ZipFile(BytesIO(response.content))
-zf.extractall(binpath, members=[x for x in zf.namelist() if 'bias' in x])
+zf.extractall(binpath, members=[x for x in zf.namelist() if 'bias' in x or 'dll' in x])
+print(f"Extracted {[x for x in zf.namelist() if 'dll' in x or 'bias' in x]} into {binpath}")
 tee_on = binpath / "bias_tee_on.bat"
 assert os.path.isfile(tee_on)
 
