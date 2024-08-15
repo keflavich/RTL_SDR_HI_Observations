@@ -40,3 +40,17 @@ and in a new cell, replacing <USERNAME> appropriately,
 The LNA light should stay illuminated and a plot should appear.
 If you get a USB -12 error message, try changing the device ID (e.g., --device=1).
 You can use `rtl_tcp` from powershell to see a list of devices
+
+
+
+Mac Installation
+================
+
+ * Install libusb (I used conda/mamba)
+ * Install rtlsdr
+   * for arm64, needed to specify both global flags and `cmake -DCMAKE_OSX_ARCHITECTURES=arm64 ..` when running cmake in `librtlsdr/src`
+   * had to overwrite pyrtlsdr lib files:
+     * ln -vsf /usr/local/lib/librtl* /Users/adam/mambaforge/envs/py312/lib/python3.12/site-packages/pyrtlsdrlib/lib/
+     * ln -vsf /usr/local/lib/libusb* /Users/adam/mambaforge/envs/py312/lib/python3.12/site-packages/pyrtlsdrlib/lib/
+     * ln -vsf /usr/local/lib/libusb* /Users/adam/mambaforge/envs/py312/lib/python3.12/site-packages/pyrtlsdrlib/lib/custom_build/
+     * ln -vsf /usr/local/lib/librtl* /Users/adam/mambaforge/envs/py312/lib/python3.12/site-packages/pyrtlsdrlib/lib/custom_build/
