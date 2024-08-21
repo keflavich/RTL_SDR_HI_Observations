@@ -17,7 +17,8 @@ Set up a new computer with the software needed for RLT-SDR HI observations.  The
     numpy
     tqdm
     astroquery
-    pyrtlsdrlib   
+    pyrtlsdrlib
+   * so you should `pip install     astroplan    astropy    reproject    matplotlib    numpy    tqdm    astroquery    pyrtlsdrlib`
 8. Retrieve & run this script: [install_rtlsdr.py](install_rtlsdr.py) from within a Jupyter environment
 9. To verify this will work for students, set up a notebook and run:
 
