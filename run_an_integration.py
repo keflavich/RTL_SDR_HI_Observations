@@ -16,27 +16,33 @@ def get_1420psd(overwrite=False):
         with open('1420_psd.py', 'w') as fh:
             fh.write(response.text)
 
-def determine_path(possible_users=['student', 'lab-admin', 'lab', 'Public', 'admina']):
+def determine_path(possible_users=['student', 'lab-admin', 'lab', 'Public', 'admina', 'Lab', 'adam']):
     anaconda_path = os.path.split(sys.executable)[0]
     binpath = os.path.join(anaconda_path, 'Library', 'bin')
     bias_tee_path = os.path.join(binpath, 'rtl_biast')
 
     if os.path.exists(bias_tee_path):
         return binpath
+    elif os.path.exists(os.path.join(anaconda_path, 'rtl_biast')):
+        return os.path.exists(os.path.join(anaconda_path, 'rtl_biast'))
     else:
         root = os.path.abspath(os.sep)
         for username in possible_users:
-            for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda'):
+            for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda', 'mambaforge'):
                 binpath = os.path.join(root, 'Users', username, anacondapath, 'Library', 'bin')
                 bias_tee_path = os.path.join(binpath, 'rtl_biast')
                 if os.path.exists(bias_tee_path) or os.path.exists(bias_tee_path+".exe"):
                     return binpath
         for basepath in ('ProgramData',):
-            for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda'):
+            for anacondapath in ('anaconda3', 'Anaconda3', 'anaconda', 'Anaconda', 'mambaforge'):
                 binpath = os.path.join(root, basepath, anacondapath, 'Library', 'bin')
                 bias_tee_path = os.path.join(binpath, 'rtl_biast')
                 if os.path.exists(bias_tee_path) or os.path.exists(bias_tee_path+".exe"):
                     return binpath
+        for binpath in os.getenv('PATH').split(os.pathsep):
+            bias_tee_path = os.path.join(binpath, 'rtl_biast')
+            if os.path.exists(bias_tee_path) or os.path.exists(bias_tee_path+".exe"):
+                return binpath
 
     raise IOError("rtl_biast wasn't found in any of the search directories!  "
                   "Maybe it's not installed?")
