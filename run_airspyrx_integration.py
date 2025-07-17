@@ -71,7 +71,9 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
 
     filenames = []
     for ii in range(sample_time_s):
-        command = f"airspy_rx -r {output_filename}_{ii} -f {frequency} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        output_filename_thisiter = f"{output_filename}_{ii}"
+
+        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
 
@@ -79,19 +81,19 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
             result = subprocess.run(command, shell=True, capture_output=True)
             print(result.stdout.decode("utf-8"))
 
-            data = np.fromfile(f'{output_filename}_{ii}', dtype=type_to_dtype[type])
+            data = np.fromfile(output_filename_thisiter, dtype=type_to_dtype[type])
             if len(data) >= samplerate:
                 isok = True
             else:
                 print(f"Expected >={samplerate} samples, got {len(data)}: dropped samples!  Retrying...")
 
-        filenames.append(f'{output_filename}_{ii}')
+        filenames.append(output_filename_thisiter)
 
         if result.returncode != 0:
-            if os.path.exists(output_filename):
-                print(f"airspy_rx ended with return code {result.returncode}")
+            if os.path.exists(output_filename_thisiter):
+                print(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
             else:
-                raise RuntimeError(f"airspy_rx ended with return code {result.returncode}")
+                raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
 
     meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
 
