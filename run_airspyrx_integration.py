@@ -73,7 +73,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     print(result.stdout.decode("utf-8"))
 
     if result.returncode != 0:
-        raise RuntimeError(f"airspy_rx failed with return code {result.returncode}")
+        print(f"airspy_rx ended with return code {result.returncode}")
 
     average_integration(output_filename, samplerate, type_to_dtype[type])
 
