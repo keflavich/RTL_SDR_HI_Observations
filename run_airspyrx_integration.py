@@ -145,7 +145,6 @@ def save_integration(filename, frequency, meanpower, obs_lat=None, obs_lon=None,
     now_ap = Time.now()
 
     tbl = Table({'spectrum': meanpower, 'frequency': frequency})
-
     tbl.meta['obs_lat'] = obs_lat
     tbl.meta['obs_lon'] = obs_lon
     tbl.meta['altitude'] = altitude
@@ -176,4 +175,5 @@ if __name__ == "__main__":
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx", in_memory=False)
 
+    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx", in_memory=True)
