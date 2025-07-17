@@ -44,6 +44,8 @@ type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
 
 def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
+                              fsw=True,
+                              fsw_throw=int(5e6),
                               samplerate=int(1e7),
                               sample_time_s=60,
                               type=0,
@@ -54,7 +56,9 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                               bias_tee=1,
                               in_memory=None,
                               output_filename="1420_integration.rx",
-                              cleanup=True):
+                              cleanup=True,
+                              **kwargs
+                             ):
     """
     Run an airspy_rx integration
     """
@@ -76,13 +80,18 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         output_filename_thisiter = f"{output_filename}_{ii}"
         t0 = perf_counter()
 
-        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        if fsw:
+            frequency_to_tune = frequency + fsw_throw/1e6/2 * (-1 if ii % 2 == 1 else 1)
+        else:
+            frequency_to_tune = frequency
+
+        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
 
         while not isok:
             result = subprocess.run(command, shell=True, capture_output=True)
-            print(result.stdout.decode("utf-8"), result.stderr.decode("utf-8"))
+            #print(result.stdout.decode("utf-8"), result.stderr.decode("utf-8"))
 
             data = np.fromfile(output_filename_thisiter, dtype=type_to_dtype[type])
             if len(data) >= samplerate:
@@ -103,7 +112,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency*1e6).astype(np.float32)
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
-    save_integration(savename_fits, frequency_array, meanpower)
+    save_integration(savename_fits, frequency_array, meanpower, **kwargs)
 
     if cleanup:
         for filename in filenames:
