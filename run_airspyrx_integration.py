@@ -161,7 +161,7 @@ def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True
     return np.abs(meanpower)
 
 
-def save_fsw_integration(filename, f1, f2, meanpower1, meanpower2, decimate=False, **kwargs):
+def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, **kwargs):
 
     if decimate:
         tbl = Table({'spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate),
