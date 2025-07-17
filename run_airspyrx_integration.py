@@ -47,7 +47,8 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                               mixer_gain=15,
                               bias_tee=1,
                               in_memory=None,
-                              output_filename="1420_integration.rx"):
+                              output_filename="1420_integration.rx",
+                              cleanup=True):
     """
     Run an airspy_rx integration
     """
@@ -72,7 +73,13 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
 
     average_integration(output_filename, samplerate, type_to_dtype[type])
 
-def average_integration(filename, nchan, dtype, in_memory=False):
+    frequency_array = np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency
+    save_integration(output_filename.replace(".rx", ".fits"), frequency_array, meanpower)
+
+    if cleanup:
+        os.remove(output_filename)
+
+def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True):
     """
     Compute the power spectrum and average over time
     """
@@ -104,15 +111,42 @@ def average_integration(filename, nchan, dtype, in_memory=False):
     return meanpower
 
 
+def save_integration(filename, frequency, meanpower, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
+
+    if obs_lat is None:
+        obs_lat, obs_lon, elevation = whereami()
+
+    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    now_ap = Time.now()
+
+    tbl = Table({'spectrum': meanpower, 'frequency': frequency})
+
+    tbl.meta['obs_lat'] = obs_lat
+    tbl.meta['obs_lon'] = obs_lon
+    tbl.meta['altitude'] = altitude
+    tbl.meta['elevation'] = elevation
+    tbl.meta['azimuth'] = azimuth
+
+    tbl.meta['tint'] = int_time
+    tbl.meta['date-obs'] = now
+    tbl.meta['mjd-obs'] = now_ap.mjd
+    tbl.meta['jd-obs'] = now_ap.jd
+
+    tbl.write(filename)
+
+
+def whereami():
+    import requests
+    import geocoder
+    myloc = geocoder.ip('me')
+    lat, lon = myloc.latlng
+    query = f'https://api.open-elevation.com/api/v1/lookup?locations={lat},{long}'
+    resp = requests.get(query)
+    return lat, lon, resp.json()['results'][0]['elevation']
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
-    result = subprocess.run("airspy_rx", capture_output=True)
-    print(result.stdout.decode("utf-8"))
 
-    result = subprocess.run("airspy_rx", capture_output=True, shell=True)
-    print(result.stdout.decode("utf-8"))
-
-    result = subprocess.check_call("airspy_rx")
-    print(result)
-
-    run_airspy_rx_integration(sample_time_s=6)
+    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx")
