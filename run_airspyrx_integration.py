@@ -86,7 +86,6 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         else:
             frequency_to_tune = frequency
 
-        # TODO: figure out if running 5s integrations is more efficient (currently takes 5s to do a 1s integration)
         command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
@@ -109,19 +108,33 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
             else:
                 raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
 
-    meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
+    if fsw:
+        meanpower1 = average_integration(filenames[::2], samplerate, type_to_dtype[type])
+        meanpower2 = average_integration(filenames[1::2], samplerate, type_to_dtype[type])
+    else:
+        meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
 
-    frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency*1e6).astype(np.float32)
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
-    save_integration(savename_fits, frequency_array, meanpower, **kwargs)
+    if fsw:
+        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + (frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
+        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + (frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
+
+        save_integration(savename_fits,
+                         frequency1=frequency_array1,
+                         frequency2=frequency_array2,
+                         meanpower1=meanpower1,
+                         meanpower2=meanpower2, **kwargs)
+    else:
+        frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency*1e6).astype(np.float32)
+        save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
 
     if cleanup:
         for filename in filenames:
             os.remove(filename)
 
 
-def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True):
+def average_integration(filenames, nchan, dtype, fsw, in_memory=False, overwrite=True):
     """
     Compute the power spectrum and average over time
     """
@@ -148,20 +161,47 @@ def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True
     return np.abs(meanpower)
 
 
-def save_integration(filename, frequency, meanpower, decimate=False, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
+def save_fsw_integration(filename, f1, f2, meanpower1, meanpower2, decimate=False, **kwargs)
 
-    if obs_lat is None:
-        obs_lat, obs_lon, elevation = whereami()
+    if decimate:
+        tbl = Table({'spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate),
+                     'frequency1': scipy.signal.decimate(frequency1, decimate),
+                     'frequency2': scipy.signal.decimate(frequency2, decimate),
+                     'meanpower1': scipy.signal.decimate(meanpower1, decimate),
+                     'meanpower2': scipy.signal.decimate(meanpower2, decimate)
+                    })
+    else:
+        tbl = Table({'spectrum': meanpower1 - meanpower2,
+                     'frequency1': frequency1,
+                     'frequency2': frequency2,
+                     'meanpower1': meanpower1,
+                     'meanpower2': meanpower2
+                    })
+    save_tbl(tbl, **kwargs)
 
-    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    now_ap = Time.now()
+
+def save_integration(filename, frequency, meanpower, decimate=False, **kwargs)
 
     if decimate:
         tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate),
                      'frequency': scipy.signal.decimate(frequency, decimate)})
     else:
         tbl = Table({'spectrum': meanpower, 'frequency': frequency})
-        
+
+    save_tbl(tbl, **kwargs)
+
+def save_tbl(tbl, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
+
+    if obs_lat is None:
+        try:
+            obs_lat, obs_lon, elevation = whereami()
+        except Exception as ex:
+            print(f"Unable to determine where you are because {ex}.  Setting lon, lat, elev = 0,0,0")
+            obs_lat, obs_lon, elevation = 0, 0, 0
+
+    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    now_ap = Time.now()
+    
     tbl.meta['obs_lat'] = obs_lat
     tbl.meta['obs_lon'] = obs_lon
     tbl.meta['altitude'] = altitude
