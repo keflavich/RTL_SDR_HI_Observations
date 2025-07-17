@@ -42,7 +42,7 @@ type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
 def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
-                              samplerate=int(8e6),
+                              samplerate=int(1e7),
                               sample_time_s=60,
                               type=0,
                               gain=20,
@@ -67,18 +67,31 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         # do it in-memory if the file is less than 2GB
         in_memory = n_samples * bytes_per_sample < 2*1024**3
 
-    command = f"airspy_rx -r {output_filename} -f {frequency} -a {samplerate} -t {type} -n {n_samples} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+    filenames = []
+    for ii in range(sample_time_s):
+        command = f"airspy_rx -r {output_filename}_{ii} -f {frequency} -a {samplerate} -t {type} -n {samplerate} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
-    result = subprocess.run(command, shell=True, capture_output=True)
-    print(result.stdout.decode("utf-8"))
+        isok = False
 
-    if result.returncode != 0:
-        if os.path.exists(output_filename):
-            print(f"airspy_rx ended with return code {result.returncode}")
-        else:
-            raise RuntimeError(f"airspy_rx ended with return code {result.returncode}")
+        while not isok:
+            result = subprocess.run(command, shell=True, capture_output=True)
+            print(result.stdout.decode("utf-8"))
 
-    meanpower = average_integration(output_filename, samplerate, type_to_dtype[type])
+            data = np.fromfile(f'{output_filename}_{ii}', dtype=type_to_dtype[type])
+            if len(data) == samplerate:
+                isok = True
+            else:
+                print(f"Expected {samplerate} samples, got {len(data)}: dropped samples!  Retrying...")
+
+        filenames.append(f'{output_filename}_{ii}')
+
+        if result.returncode != 0:
+            if os.path.exists(output_filename):
+                print(f"airspy_rx ended with return code {result.returncode}")
+            else:
+                raise RuntimeError(f"airspy_rx ended with return code {result.returncode}")
+
+    meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
 
     frequency_array = np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency
     save_integration(output_filename.replace(".rx", ".fits"), frequency_array, meanpower)
@@ -94,26 +107,21 @@ def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True)
     pbar = tqdm.tqdm(desc="Averaging integration")
 
     if in_memory:
-        data = (np.fromfile(filename, dtype=dtype)).reshape(-1, nchan)
+        data = np.array([(np.fromfile(filename, dtype=dtype))
+                         for filename in filenames])
         dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
         meanpower = dataft.mean(axis=0)
     else:
-        with open(filename, "rb") as fh:
-            accum = np.zeros(nchan, dtype=dtype)
-            n_samples = 0
-            while True:
-                pbar.update(1)
-                data = np.fromfile(fh, dtype=dtype, count=nchan)
-                if len(data) == nchan:
-                    dataft = np.fft.fftshift(np.abs(np.fft.fft(data))**2)
-                    accum += dataft
-                    n_samples += 1
-                elif len(data) == 0:
-                    break
-                else:
-                    raise ValueError(f"Expected {nchan} samples, got {len(data)}")
+        accum = np.zeros(nchan, dtype=dtype)
+        n_samples = 0
+        for filename in filenames:
+            pbar.update(1)
+            data = np.fromfile(filename, dtype=dtype)
+            dataft = np.fft.fftshift(np.abs(np.fft.fft(data))**2)
+            accum += dataft
+            n_samples += 1
 
-            meanpower = accum / n_samples
+        meanpower = accum / n_samples
 
     return meanpower
 
