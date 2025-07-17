@@ -75,7 +75,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     if result.returncode != 0:
         print(f"airspy_rx ended with return code {result.returncode}")
 
-    average_integration(output_filename, samplerate, type_to_dtype[type])
+    meanpower = average_integration(output_filename, samplerate, type_to_dtype[type])
 
     frequency_array = np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency
     save_integration(output_filename.replace(".rx", ".fits"), frequency_array, meanpower)
@@ -91,7 +91,7 @@ def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True)
     pbar = tqdm.tqdm(desc="Averaging integration")
 
     if in_memory:
-        data = (np.fromfile(fn, dtype=dtype)).reshape(-1, nchan)
+        data = (np.fromfile(filename, dtype=dtype)).reshape(-1, nchan)
         dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
         meanpower = dataft.mean(axis=0)
     else:
@@ -153,4 +153,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx")
+    run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx", in_memory=False)
+
+    run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx", in_memory=True)
