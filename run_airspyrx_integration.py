@@ -70,11 +70,11 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         # do it in-memory if the file is less than 2GB
         in_memory = n_samples * bytes_per_sample < 2*1024**3
 
-    t0 = perf_counter()
 
     filenames = []
     for ii in range(sample_time_s):
         output_filename_thisiter = f"{output_filename}_{ii}"
+        t0 = perf_counter()
 
         command = f"airspy_rx -r {output_filename_thisiter} -f {frequency} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
@@ -88,7 +88,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
             if len(data) >= samplerate:
                 isok = True
             else:
-                print(f"Expected >={samplerate} samples, got {len(data)}: dropped samples!  Retrying...")
+                print(f"Expected >={samplerate} samples, got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
 
         filenames.append(output_filename_thisiter)
 
