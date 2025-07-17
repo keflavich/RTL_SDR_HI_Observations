@@ -34,6 +34,7 @@ from astropy.time import Time
 from astropy.table import Table
 import os
 from time import perf_counter
+from astropy import constants
 
 hi_restfreq = 1420.405751786 * u.MHz
 
@@ -44,11 +45,12 @@ type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
 
-def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
+def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                               fsw=True,
                               fsw_throw=int(5e6),
                               samplerate=int(1e7),
                               sample_time_s=60,
+                              n_integrations=10,
                               type=0,
                               gain=20,
                               lna_gain=14,
@@ -58,10 +60,23 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                               in_memory=None,
                               output_filename="1420_integration.rx",
                               cleanup=True,
+                              channel_width=1*u.km/u.s,
                               **kwargs
                              ):
     """
     Run an airspy_rx integration
+
+    The sample time ``sample_time_s`` is the total time to integrate.
+    It will be broken into n_integrations individual integrations that will
+    be averaged together.
+    Fewer integrations is more efficient, but more memory intensive.
+
+    The channel width ``channel_width`` is the width of the channel in velocity.
+    The 10 MHz of bandwidth (about 2100 km/s) will be split into channels of
+    this width.
+
+    fsw_throw is the difference in frequency between the two frequencies when
+    doing frequency switching.
     """
     if type in (2, 3, 4, 5):
         raise NotImplementedError(f"Type {type} not implemented")
@@ -77,14 +92,14 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         in_memory = n_samples * bytes_per_sample < (2 * 1024**3)
 
     filenames = []
-    for ii in range(sample_time_s):
+    for ii in range(n_integrations):
         output_filename_thisiter = f"{output_filename}_{ii}"
         t0 = perf_counter()
 
         if fsw:
-            frequency_to_tune = frequency + fsw_throw/1e6/2 * (-1 if ii % 2 == 1 else 1)
+            frequency_to_tune = ref_frequency + fsw_throw/1e6/2 * (-1 if ii % 2 == 1 else 1)
         else:
-            frequency_to_tune = frequency
+            frequency_to_tune = ref_frequency
 
         command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
@@ -109,16 +124,16 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                 raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
 
     if fsw:
-        meanpower1 = average_integration(filenames[::2], samplerate, type_to_dtype[type])
-        meanpower2 = average_integration(filenames[1::2], samplerate, type_to_dtype[type])
+        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type])
+        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type])
     else:
-        meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
+        meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[type])
 
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
     if fsw:
-        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
-        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
+        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
+        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
 
         save_fsw_integration(savename_fits,
                              frequency1=frequency_array1,
@@ -126,7 +141,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                              meanpower1=meanpower1,
                              meanpower2=meanpower2, **kwargs)
     else:
-        frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency*1e6).astype(np.float32)
+        frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency*1e6).astype(np.float32)
         save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
 
     if cleanup:
@@ -134,16 +149,23 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
             os.remove(filename)
 
 
-def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True):
+def average_integration(filenames, dtype, in_memory=False,
+                        overwrite=True, channel_width=1*u.km/u.s,
+                        sample_rate=1e7, ref_frequency=1420*u.MHz):
     """
     Compute the power spectrum and average over time
     """
 
     pbar = tqdm.tqdm(desc="Averaging integration")
 
+    nchan = int(((sample_rate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
+
     if in_memory:
-        data = np.array([(np.fromfile(filename, dtype=dtype, count=nchan))
-                         for filename in filenames])
+        data = np.concatenate([(np.fromfile(filename, dtype=dtype))
+                                for filename in filenames])
+        datasize = data.size - (data.size % nchan)
+        data = data[:datasize].reshape(datasize//nchan, nchan)
+
         dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
         meanpower = dataft.mean(axis=0)
     else:
@@ -151,10 +173,14 @@ def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True
         n_samples = 0
         for filename in filenames:
             pbar.update(1)
-            data = np.fromfile(filename, dtype=dtype, count=nchan)
-            dataft = np.fft.fftshift(np.abs(np.fft.fft(data))**2)
-            accum += dataft
-            n_samples += 1
+            data = np.fromfile(filename, dtype=dtype)
+            datasize = data.size - (data.size % nchan)
+            nmeasurements = datasize // nchan
+            data = data[:datasize].reshape(nmeasurements, nchan)
+
+            dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
+            accum += dataft.sum(axis=0)
+            n_samples += nmeasurements
 
         meanpower = accum / n_samples
 
@@ -201,7 +227,7 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     now_ap = Time.now()
-    
+
     tbl.meta['obs_lat'] = obs_lat
     tbl.meta['obs_lon'] = obs_lon
     tbl.meta['altitude'] = altitude
@@ -229,8 +255,8 @@ def whereami():
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=5)
+    # now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    # run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=5)
 
-    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=True, decimate=5)
+    # now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    #run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=True, decimate=5)
