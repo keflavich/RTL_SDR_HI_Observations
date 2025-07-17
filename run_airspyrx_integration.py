@@ -189,7 +189,7 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx", in_memory=False)
+    run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=5)
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    run_airspy_rx_integration(sample_time_s=6, output_filename=f"1420_integration_{now}.rx", in_memory=True)
+    run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=True, decimate=5)
