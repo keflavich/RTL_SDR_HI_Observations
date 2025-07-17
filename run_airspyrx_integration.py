@@ -109,6 +109,9 @@ if __name__ == "__main__":
     result = subprocess.run("airspy_rx", capture_output=True)
     print(result.stdout.decode("utf-8"))
 
+    result = subprocess.run("airspy_rx", capture_output=True, shell=True)
+    print(result.stdout.decode("utf-8"))
+
     result = subprocess.check_call("airspy_rx")
     print(result)
 
