@@ -165,7 +165,7 @@ def whereami():
     import geocoder
     myloc = geocoder.ip('me')
     lat, lon = myloc.latlng
-    query = f'https://api.open-elevation.com/api/v1/lookup?locations={lat},{long}'
+    query = f'https://api.open-elevation.com/api/v1/lookup?locations={lat},{lon}'
     resp = requests.get(query)
     return lat, lon, resp.json()['results'][0]['elevation']
 
