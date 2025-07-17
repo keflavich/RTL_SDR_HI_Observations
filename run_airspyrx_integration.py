@@ -96,10 +96,13 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
 
     frequency_array = np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency
-    save_integration(output_filename.replace(".rx", ".fits"), frequency_array, meanpower)
+    savename_fits = output_filename.replace(".rx", ".fits")
+    assert savename_fits.endswith(".fits")
+    save_integration(savename_fits, frequency_array, meanpower)
 
     if cleanup:
-        os.remove(output_filename)
+        for filename in filenames:
+            os.remove(filename)
 
 def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True):
     """
