@@ -34,13 +34,14 @@ from astropy.table import Table
 import os
 from time import perf_counter
 
-hi_restfreq = 1420.405751786*u.MHz
+hi_restfreq = 1420.405751786 * u.MHz
 
 type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np.uint16, 5: np.uint8}
 # this is a guess, but reading in complex floats should read real then imaginary in order.
 # FLOAT32_REAL should just be dropping half the data, effectively
 # INT16_IQ is .... super weird, it's integer real, integer imaginary, flipping back and forth - there's no built-in reader for that
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
+
 
 def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                               samplerate=int(1e7),
@@ -57,19 +58,18 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     """
     Run an airspy_rx integration
     """
-    if type in (2,3,4,5):
+    if type in (2, 3, 4, 5):
         raise NotImplementedError(f"Type {type} not implemented")
     if samplerate not in (int(1e7), int(2.5e6)):
         raise NotImplementedError(f"Samplerate {samplerate} not supported")
 
     n_samples = int(samplerate * sample_time_s)
-    bytes_per_sample = {0: 8, 1:4, 2: 4, 3: 2, 4:2, 5: 1}[type]
+    bytes_per_sample = {0: 8, 1: 4, 2: 4, 3: 2, 4: 2, 5: 1}[type]
     logging.info(f"Expected file size: {n_samples * bytes_per_sample / 1024**3:.2f} GB")
 
     if in_memory is None:
         # do it in-memory if the file is less than 2GB
-        in_memory = n_samples * bytes_per_sample < 2*1024**3
-
+        in_memory = n_samples * bytes_per_sample < (2 * 1024**3)
 
     filenames = []
     for ii in range(sample_time_s):
@@ -108,6 +108,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     if cleanup:
         for filename in filenames:
             os.remove(filename)
+
 
 def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True):
     """
