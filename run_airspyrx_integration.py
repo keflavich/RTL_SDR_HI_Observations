@@ -109,7 +109,7 @@ if __name__ == "__main__":
     result = subprocess.run("airspy_rx", capture_output=True)
     print(result.stdout.decode("utf-8"))
 
-    result = subprocess.check_call("airspy_rx", capture_output=True)
-    print(result.stdout.decode("utf-8"))
+    result = subprocess.check_call("airspy_rx")
+    print(result)
 
     run_airspy_rx_integration(sample_time_s=6)
