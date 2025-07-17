@@ -109,7 +109,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         for filename in filenames:
             os.remove(filename)
 
-def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True):
+def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True):
     """
     Compute the power spectrum and average over time
     """
