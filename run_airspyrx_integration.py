@@ -120,11 +120,11 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
         frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
 
-        save_integration(savename_fits,
-                         frequency1=frequency_array1,
-                         frequency2=frequency_array2,
-                         meanpower1=meanpower1,
-                         meanpower2=meanpower2, **kwargs)
+        save_fsw_integration(savename_fits,
+                             frequency1=frequency_array1,
+                             frequency2=frequency_array2,
+                             meanpower1=meanpower1,
+                             meanpower2=meanpower2, **kwargs)
     else:
         frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency*1e6).astype(np.float32)
         save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
