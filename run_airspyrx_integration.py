@@ -82,7 +82,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.Hz).value,
 
         while not isok:
             result = subprocess.run(command, shell=True, capture_output=True)
-            print(result.stdout.decode("utf-8"))
+            print(result.stdout.decode("utf-8"), result.stderr.decode("utf-8"))
 
             data = np.fromfile(output_filename_thisiter, dtype=type_to_dtype[type])
             if len(data) >= samplerate:
