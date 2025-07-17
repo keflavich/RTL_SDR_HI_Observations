@@ -117,8 +117,8 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
     if fsw:
-        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + (frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
-        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + (frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
+        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
+        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
 
         save_integration(savename_fits,
                          frequency1=frequency_array1,
@@ -134,7 +134,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
             os.remove(filename)
 
 
-def average_integration(filenames, nchan, dtype, fsw, in_memory=False, overwrite=True):
+def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True):
     """
     Compute the power spectrum and average over time
     """
