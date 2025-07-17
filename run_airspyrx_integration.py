@@ -58,6 +58,8 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
     """
     if type in (2,3,4,5):
         raise NotImplementedError(f"Type {type} not implemented")
+    if samplerate not in (int(1e7), int(2.5e6)):
+        raise NotImplementedError(f"Samplerate {samplerate} not supported")
 
     n_samples = int(samplerate * sample_time_s)
     bytes_per_sample = {0: 8, 1:4, 2: 4, 3: 2, 4:2, 5: 1}[type]
@@ -69,7 +71,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
 
     filenames = []
     for ii in range(sample_time_s):
-        command = f"airspy_rx -r {output_filename}_{ii} -f {frequency} -a {samplerate} -t {type} -n {samplerate} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        command = f"airspy_rx -r {output_filename}_{ii} -f {frequency} -a {samplerate} -t {type} -n {int(samplerate * 1.1)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
 
@@ -78,10 +80,10 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
             print(result.stdout.decode("utf-8"))
 
             data = np.fromfile(f'{output_filename}_{ii}', dtype=type_to_dtype[type])
-            if len(data) == samplerate:
+            if len(data) >= samplerate:
                 isok = True
             else:
-                print(f"Expected {samplerate} samples, got {len(data)}: dropped samples!  Retrying...")
+                print(f"Expected >={samplerate} samples, got {len(data)}: dropped samples!  Retrying...")
 
         filenames.append(f'{output_filename}_{ii}')
 
@@ -107,7 +109,7 @@ def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True)
     pbar = tqdm.tqdm(desc="Averaging integration")
 
     if in_memory:
-        data = np.array([(np.fromfile(filename, dtype=dtype))
+        data = np.array([(np.fromfile(filename, dtype=dtype, count=nchan))
                          for filename in filenames])
         dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
         meanpower = dataft.mean(axis=0)
@@ -116,7 +118,7 @@ def average_integration(filename, nchan, dtype, in_memory=False, overwrite=True)
         n_samples = 0
         for filename in filenames:
             pbar.update(1)
-            data = np.fromfile(filename, dtype=dtype)
+            data = np.fromfile(filename, dtype=dtype, count=nchan)
             dataft = np.fft.fftshift(np.abs(np.fft.fft(data))**2)
             accum += dataft
             n_samples += 1
