@@ -32,6 +32,7 @@ import datetime
 from astropy.time import Time
 from astropy.table import Table
 import os
+from time import perf_counter
 
 hi_restfreq = 1420.405751786*u.MHz
 
@@ -69,6 +70,8 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
         # do it in-memory if the file is less than 2GB
         in_memory = n_samples * bytes_per_sample < 2*1024**3
 
+    t0 = perf_counter()
+
     filenames = []
     for ii in range(sample_time_s):
         output_filename_thisiter = f"{output_filename}_{ii}"
@@ -91,7 +94,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
 
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
-                print(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
+                print(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds (expected value was 1s)")
             else:
                 raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
 
