@@ -29,6 +29,7 @@ from astropy import units as u
 import numpy as np
 import tqdm
 import datetime
+import scipy.signal
 from astropy.time import Time
 from astropy.table import Table
 import os
@@ -146,7 +147,7 @@ def average_integration(filenames, nchan, dtype, in_memory=False, overwrite=True
     return np.abs(meanpower)
 
 
-def save_integration(filename, frequency, meanpower, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
+def save_integration(filename, frequency, meanpower, decimate=False, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
 
     if obs_lat is None:
         obs_lat, obs_lon, elevation = whereami()
@@ -154,7 +155,12 @@ def save_integration(filename, frequency, meanpower, obs_lat=None, obs_lon=None,
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     now_ap = Time.now()
 
-    tbl = Table({'spectrum': meanpower, 'frequency': frequency})
+    if decimate:
+        tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate),
+                     'frequency': scipy.signal.decimate(frequency, decimate)})
+    else:
+        tbl = Table({'spectrum': meanpower, 'frequency': frequency})
+        
     tbl.meta['obs_lat'] = obs_lat
     tbl.meta['obs_lon'] = obs_lon
     tbl.meta['altitude'] = altitude
