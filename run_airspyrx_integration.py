@@ -42,7 +42,7 @@ type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
 def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
-                              samplerate=int(1e7),
+                              samplerate=int(8e6),
                               sample_time_s=60,
                               type=0,
                               gain=20,
