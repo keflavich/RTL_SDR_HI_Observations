@@ -43,7 +43,7 @@ type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
 
-def run_airspy_rx_integration(frequency=hi_restfreq.to(u.Hz).value,
+def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
                               samplerate=int(1e7),
                               sample_time_s=60,
                               type=0,
@@ -100,7 +100,7 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.Hz).value,
 
     meanpower = average_integration(filenames, samplerate, type_to_dtype[type])
 
-    frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency).astype(np.float32)
+    frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + frequency*1e6).astype(np.float32)
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
     save_integration(savename_fits, frequency_array, meanpower)
