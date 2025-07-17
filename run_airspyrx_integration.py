@@ -177,7 +177,7 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
                      'meanpower1': meanpower1,
                      'meanpower2': meanpower2
                     })
-    save_tbl(tbl, **kwargs)
+    save_tbl(tbl, filename=filename, **kwargs)
 
 
 def save_integration(filename, frequency, meanpower, decimate=False, **kwargs):
@@ -188,9 +188,9 @@ def save_integration(filename, frequency, meanpower, decimate=False, **kwargs):
     else:
         tbl = Table({'spectrum': meanpower, 'frequency': frequency})
 
-    save_tbl(tbl, **kwargs)
+    save_tbl(tbl, filename=filename, **kwargs)
 
-def save_tbl(tbl, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
+def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
 
     if obs_lat is None:
         try:
