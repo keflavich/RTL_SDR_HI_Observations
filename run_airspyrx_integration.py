@@ -64,7 +64,8 @@ def run_airspy_rx_integration(frequency=hi_restfreq.to(u.MHz).value,
 
     command = f"airspy_rx -r {output_filename} -f {frequency} -a {samplerate} -t {type} -n {n_samples} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
-    result = subprocess.run(command, shell=True)
+    result = subprocess.run(command, shell=True, capture_output=True)
+    print(result.stdout.decode("utf-8"))
 
     if result.returncode != 0:
         raise RuntimeError(f"airspy_rx failed with return code {result.returncode}")
