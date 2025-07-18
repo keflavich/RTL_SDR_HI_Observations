@@ -122,7 +122,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
                 now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-                print(f"{now} iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds")
+                print(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds")
             else:
                 raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
 
