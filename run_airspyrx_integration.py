@@ -156,14 +156,14 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
 
 def average_integration(filenames, dtype, in_memory=False,
                         overwrite=True, channel_width=1*u.km/u.s,
-                        sample_rate=1e7, ref_frequency=1420*u.MHz):
+                        samplerate=1e7, ref_frequency=1420*u.MHz):
     """
     Compute the power spectrum and average over time
     """
 
     pbar = tqdm.tqdm(desc="Averaging integration")
 
-    nchan = int(((sample_rate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
+    nchan = int(((samplerate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
 
     if in_memory:
         data = np.concatenate([(np.fromfile(filename, dtype=dtype))
