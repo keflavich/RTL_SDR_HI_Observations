@@ -28,6 +28,7 @@ import logging
 from astropy import units as u
 import numpy as np
 import tqdm
+import time
 import datetime
 import scipy.signal
 from astropy.time import Time
@@ -61,6 +62,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                               output_filename="1420_integration.rx",
                               cleanup=True,
                               channel_width=1*u.km/u.s,
+                              sleep_between_integrations=3,
                               **kwargs
                              ):
     """
@@ -119,9 +121,12 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
 
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
-                print(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds (expected value was 1s)")
+                now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+                print(f"{now} iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds")
             else:
                 raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
+
+        time.sleep(sleep_between_integrations)
 
     if fsw:
         meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type])
