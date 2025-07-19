@@ -124,7 +124,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                 now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
                 print(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds")
             else:
-                raise RuntimeError(f"iteration {ii} of {sample_time_s} of airspy_rx ended with return code {result.returncode}")
+                raise RuntimeError(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode}")
 
         time.sleep(sleep_between_integrations)
 
@@ -155,7 +155,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
 
 
 def average_integration(filenames, dtype, in_memory=False,
-                        overwrite=True, channel_width=1*u.km/u.s,
+                        channel_width=1*u.km/u.s,
                         samplerate=1e7, ref_frequency=1420*u.MHz):
     """
     Compute the power spectrum and average over time
