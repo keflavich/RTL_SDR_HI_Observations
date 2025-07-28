@@ -23,6 +23,7 @@ Usage:
 [-d]: Verbose mode
 """
 
+import pylab as pl
 import subprocess
 import logging
 from astropy import units as u
