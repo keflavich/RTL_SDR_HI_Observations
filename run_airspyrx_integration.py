@@ -147,6 +147,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
     if fsw:
         frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
         frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/1e6/2)*1e6).astype(np.float32)
+        logging.debug(f'frequency array 1 extrema = {frequency_array1.min():0.3f} MHz, {frequency_array1.max():0.3f} MHz')
+        logging.debug(f'frequency array 2 extrema = {frequency_array2.min():0.3f} MHz, {frequency_array2.max():0.3f} MHz')
 
         save_fsw_integration(savename_fits,
                              frequency1=frequency_array1,
