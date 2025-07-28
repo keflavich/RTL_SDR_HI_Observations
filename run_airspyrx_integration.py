@@ -104,7 +104,9 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         else:
             frequency_to_tune = ref_frequency
 
-        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {int(n_samples // n_integrations * extra_sample_buffer)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        nsamples_requested = int(n_samples // n_integrations * extra_sample_buffer)
+
+        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
 
@@ -117,14 +119,14 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
             if len(data) >= n_samples // n_integrations * 0.9:
                 isok = True
             else:
-                print(f"Expected >={n_samples // n_integrations} samples, got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
+                print(f"Expected >={n_samples // n_integrations} samples (requested {nsamples_requested}), got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
 
         filenames.append(output_filename_thisiter)
 
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
                 now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-                print(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds")
+                print(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  (3221225477 is a good return code)")
             else:
                 raise RuntimeError(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode}")
 
