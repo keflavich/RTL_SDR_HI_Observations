@@ -64,6 +64,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                               channel_width=1*u.km/u.s,
                               sleep_between_integrations=3,
                               extra_sample_buffer=1.01,
+                              doplot=True,
                               **kwargs
                              ):
     """
@@ -158,6 +159,27 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
             os.remove(filename)
 
 
+def plot_table(filename):
+    import pylab as pl
+    tbl = Table.read(filename)
+    if 'meanpower1' in tbl.colnames and 'meanpower2' in tbl.colnames:
+        ax = pl.subplot(2, 1, 1)
+        ax.plot(tbl['frequency1'], tbl['meanpower1'], label='meanpower1')
+        ax.plot(tbl['frequency2'], tbl['meanpower2'], label='meanpower2')
+        pl.xlabel("Frequency (Hz)")
+        ax2 = pl.subplot(2, 1, 2)
+        velo = (ref_frequency - tbl['frequency1']) / ref_frequency * constants.c
+        pl.plot(velo, tbl['spectrum'], label='meanpower1 - meanpower2')
+        pl.xlabel("Velocity (km/s)")
+    else:
+        pl.plot(tbl['frequency'], tbl['spectrum'])
+        pl.xlabel("Frequency (Hz)")
+    outfilename = filename.replace(".fits", ".png")
+    if not outfilename.endswith(".png"):
+        outfilename += ".png"
+    pl.savefig(outfilename, bbox_inches='tight')
+
+
 def average_integration(filenames, dtype, in_memory=False,
                         channel_width=1*u.km/u.s,
                         samplerate=1e7, ref_frequency=1420*u.MHz):
@@ -212,6 +234,7 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
 
     pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
+    pl.gca().set_aspect(
     pl.xlabel("Frequency (MHz)")
     pl.ylabel("Time (s)")
     pl.colorbar()
