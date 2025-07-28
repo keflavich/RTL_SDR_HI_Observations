@@ -242,7 +242,7 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     import pylab as pl
     from astropy.visualization import simple_norm
 
-    nchan = int(((samplerate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
+    nchan = int(((u.Quantity(samplerate, u.Hz) / u.Quantity(ref_frequency, u.Hz) * constants.c) / channel_width).decompose())
 
     data = np.fromfile(filename, dtype=dtype)
     datasize = data.size - (data.size % nchan)
