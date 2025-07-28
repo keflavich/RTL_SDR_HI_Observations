@@ -65,6 +65,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                               sleep_between_integrations=3,
                               extra_sample_buffer=1.01,
                               doplot=True,
+                              do_waterfall=False,
                               **kwargs
                              ):
     """
@@ -154,6 +155,12 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency*1e6).astype(np.float32)
         save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
 
+    if do_waterfall:
+        waterfall_plot(filenames[0], ref_frequency=ref_frequency, samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
+
+    if doplot:
+        plot_table(savename_fits)
+
     if cleanup:
         for filename in filenames:
             os.remove(filename)
@@ -234,7 +241,8 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
 
     pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
-    pl.gca().set_aspect(
+    aspect = data.shape[1] / data.shape[0]
+    pl.gca().set_aspect(aspect)
     pl.xlabel("Frequency (MHz)")
     pl.ylabel("Time (s)")
     pl.colorbar()
