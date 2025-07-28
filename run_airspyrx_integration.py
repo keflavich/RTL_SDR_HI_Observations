@@ -246,7 +246,8 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
 
     pl.clf()
     pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
-    aspect = data.shape[1] / data.shape[0]
+    aspect = data.shape[0] / data.shape[1]
+    logging.debug(f"aspect={aspect}")
     pl.gca().set_aspect(aspect)
     pl.xlabel("Frequency (MHz)")
     pl.ylabel("Time (s)")
