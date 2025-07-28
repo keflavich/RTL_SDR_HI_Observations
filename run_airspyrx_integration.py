@@ -112,10 +112,10 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
             #print(result.stdout.decode("utf-8"), result.stderr.decode("utf-8"))
 
             data = np.fromfile(output_filename_thisiter, dtype=type_to_dtype[type])
-            if len(data) >= samplerate:
+            if len(data) >= n_samples // n_integrations:
                 isok = True
             else:
-                print(f"Expected >={samplerate} samples, got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
+                print(f"Expected >={n_samples // n_integrations} samples, got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
 
         filenames.append(output_filename_thisiter)
 
