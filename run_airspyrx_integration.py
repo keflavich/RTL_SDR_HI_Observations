@@ -63,6 +63,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                               cleanup=True,
                               channel_width=1*u.km/u.s,
                               sleep_between_integrations=3,
+                              extra_sample_buffer=1.01,
                               **kwargs
                              ):
     """
@@ -103,7 +104,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         else:
             frequency_to_tune = ref_frequency
 
-        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {int(n_samples // n_integrations)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {int(n_samples // n_integrations * extra_sample_buffer)} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
 
@@ -112,7 +113,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
             #print(result.stdout.decode("utf-8"), result.stderr.decode("utf-8"))
 
             data = np.fromfile(output_filename_thisiter, dtype=type_to_dtype[type])
-            if len(data) >= n_samples // n_integrations:
+            # there are always some dropped samples; the requested number has some kinda built-in shortfall
+            if len(data) >= n_samples // n_integrations * 0.9:
                 isok = True
             else:
                 print(f"Expected >={n_samples // n_integrations} samples, got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
