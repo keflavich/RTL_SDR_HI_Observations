@@ -192,6 +192,24 @@ def average_integration(filenames, dtype, in_memory=False,
     return np.abs(meanpower)
 
 
+def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw=5e6):
+    data = np.fromfile(filename, dtype=dtype)
+    datasize = data.size - (data.size % nchan)
+    nmeasurements = datasize // nchan
+    data = data[:datasize].reshape(nmeasurements, nchan)
+
+    # fft along axis=1 means that's the frequency axis
+    dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
+
+    frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + (ref_frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
+
+    pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
+    pl.xlabel("Frequency (MHz)")
+    pl.ylabel("Time (s)")
+    pl.colorbar()
+
+
+
 def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, **kwargs):
 
     if decimate:
