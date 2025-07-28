@@ -106,6 +106,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         else:
             frequency_to_tune = ref_frequency
 
+        logging.debug(f"Tuning to {frequency_to_tune:0.3f} MHz")
+
         nsamples_requested = int(n_samples // n_integrations * extra_sample_buffer)
 
         command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
