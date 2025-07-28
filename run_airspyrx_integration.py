@@ -207,7 +207,8 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     # fft along axis=1 means that's the frequency axis
     dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
 
-    frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + (ref_frequency + fsw_throw/1e6/2)*1e6).astype(np.float32)
+    rfrq = (ref_frequency.to(u.Hz).value + fsw_throw/2)
+    frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
 
     pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
     pl.xlabel("Frequency (MHz)")
