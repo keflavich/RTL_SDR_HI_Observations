@@ -164,6 +164,10 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
 
     if do_waterfall:
         waterfall_plot(filenames[0], ref_frequency=u.Quantity(frequency_to_tune, u.MHz), samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
+        outfilename = filenames[0].replace(".rx", ".png")
+        if not outfilename.endswith(".png"):
+            outfilename += ".png"
+        pl.savefig(outfilename, bbox_inches='tight')
 
     if doplot:
         plot_table(savename_fits)
@@ -236,6 +240,8 @@ def average_integration(filenames, dtype, in_memory=False,
 
 def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw=5e6, dtype=np.complex64, channel_width=1*u.km/u.s):
     import pylab as pl
+    from astropy.visualization import simple_norm
+
     nchan = int(((samplerate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
 
     data = np.fromfile(filename, dtype=dtype)
@@ -250,12 +256,12 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
 
     pl.clf()
-    pl.imshow(dataft, extent=[frequency[0]/1e9, frequency[-1]/1e9, 0, data.shape[0]])
+    pl.imshow(dataft, norm=simple_norm(dataft, stretch='log'))
     # aspect = data.shape[0] / data.shape[1]
     # logging.debug(f"aspect={aspect}")
     # pl.gca().set_aspect(aspect)
-    pl.xlabel("Frequency (MHz)")
-    pl.ylabel("Time (s)")
+    #pl.xlabel("Frequency (MHz)")
+    #pl.ylabel("Time (s)")
     pl.colorbar()
 
 
