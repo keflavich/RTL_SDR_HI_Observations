@@ -160,7 +160,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
 
     if do_waterfall:
-        waterfall_plot(filenames[0], ref_frequency=ref_frequency, samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
+        waterfall_plot(filenames[0], ref_frequency=u.Quantity(frequency_to_tune, u.MHz), samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
 
     if doplot:
         plot_table(savename_fits)
@@ -247,10 +247,10 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
 
     pl.clf()
-    pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
-    aspect = data.shape[0] / data.shape[1]
-    logging.debug(f"aspect={aspect}")
-    pl.gca().set_aspect(aspect)
+    pl.imshow(dataft, extent=[frequency[0]/1e9, frequency[-1]/1e9, 0, data.shape[0]])
+    # aspect = data.shape[0] / data.shape[1]
+    # logging.debug(f"aspect={aspect}")
+    # pl.gca().set_aspect(aspect)
     pl.xlabel("Frequency (MHz)")
     pl.ylabel("Time (s)")
     pl.colorbar()
