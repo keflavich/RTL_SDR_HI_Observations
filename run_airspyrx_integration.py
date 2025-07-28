@@ -196,7 +196,7 @@ def average_integration(filenames, dtype, in_memory=False,
     return np.abs(meanpower)
 
 
-def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw=5e6, dtype=np.complex64):
+def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw=5e6, dtype=np.complex64, channel_width=1*u.km/u.s):
     nchan = int(((samplerate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
 
     data = np.fromfile(filename, dtype=dtype)
