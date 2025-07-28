@@ -159,7 +159,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         waterfall_plot(filenames[0], ref_frequency=ref_frequency, samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
 
     if doplot:
-        plot_table(savename_fits, ref_frequency=ref_frequency)
+        plot_table(savename_fits)
 
     if cleanup:
         for filename in filenames:
@@ -176,12 +176,13 @@ def plot_table(filename, ref_frequency=hi_restfreq):
         ax.plot(tbl['frequency2'], tbl['meanpower2'], label='meanpower2')
         pl.xlabel("Frequency (Hz)")
         ax2 = pl.subplot(2, 1, 2)
-        velo = (ref_frequency - tbl['frequency1']) / ref_frequency * constants.c
-        pl.plot(velo, tbl['spectrum'], label='meanpower1 - meanpower2')
-        pl.xlabel("Velocity (km/s)")
+        velo = (ref_frequency - u.Quantity(tbl['frequency1'], u.Hz)) / ref_frequency * constants.c
+        ax2.plot(velo, tbl['spectrum'], label='meanpower1 - meanpower2')
+        ax2.set_xlabel("Velocity (km/s)")
     else:
-        pl.plot(tbl['frequency'], tbl['spectrum'])
-        pl.xlabel("Frequency (Hz)")
+        ax = pl.gca()
+        ax.plot(tbl['frequency'], tbl['spectrum'])
+        ax.set_xlabel("Frequency (Hz)")
     outfilename = filename.replace(".fits", ".png")
     if not outfilename.endswith(".png"):
         outfilename += ".png"
