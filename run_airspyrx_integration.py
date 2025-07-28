@@ -131,9 +131,9 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
                 now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-                print(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  (3221225477 is a good return code)")
+                print(f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  (3221225477 is a good return code).  stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
             else:
-                raise RuntimeError(f"{now} iteration {ii} of {n_integrations} of airspy_rx ended with return code {result.returncode}")
+                raise RuntimeError(f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode}.  stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
 
         time.sleep(sleep_between_integrations)
 
@@ -165,10 +165,6 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
 
     if do_waterfall:
         waterfall_plot(filenames[0], ref_frequency=u.Quantity(frequency_to_tune, u.MHz), samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
-        outfilename = filenames[0].replace(".rx", ".png")
-        if not outfilename.endswith(".png"):
-            outfilename += ".png"
-        pl.savefig(outfilename, bbox_inches='tight')
 
     if doplot:
         plot_table(savename_fits)
@@ -195,7 +191,7 @@ def plot_table(filename, ref_frequency=hi_restfreq):
         ax = pl.gca()
         ax.plot(tbl['frequency'], tbl['spectrum'])
         ax.set_xlabel("Frequency (Hz)")
-    outfilename = filename.replace(".fits", ".png")
+    outfilename = filename.replace(".fits", "_spectrum.png")
     if not outfilename.endswith(".png"):
         outfilename += ".png"
     pl.savefig(outfilename, bbox_inches='tight')
@@ -269,6 +265,10 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     #pl.ylabel("Time (s)")
     pl.colorbar()
 
+    outfilename = filename.replace(".rx", "_waterfall.png")
+    if not outfilename.endswith(".png"):
+        outfilename += ".png"
+    pl.savefig(outfilename, bbox_inches='tight')
 
 
 def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, **kwargs):
