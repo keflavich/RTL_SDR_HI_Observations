@@ -159,15 +159,16 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         waterfall_plot(filenames[0], ref_frequency=ref_frequency, samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
 
     if doplot:
-        plot_table(savename_fits)
+        plot_table(savename_fits, ref_frequency=ref_frequency)
 
     if cleanup:
         for filename in filenames:
             os.remove(filename)
 
 
-def plot_table(filename):
+def plot_table(filename, ref_frequency=hi_restfreq):
     import pylab as pl
+    pl.clf()
     tbl = Table.read(filename)
     if 'meanpower1' in tbl.colnames and 'meanpower2' in tbl.colnames:
         ax = pl.subplot(2, 1, 1)
@@ -240,6 +241,7 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     rfrq = (ref_frequency.to(u.Hz).value + fsw_throw/2)
     frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
 
+    pl.clf()
     pl.imshow(dataft, extent=[frequency[0], frequency[-1], 0, data.shape[0]])
     aspect = data.shape[1] / data.shape[0]
     pl.gca().set_aspect(aspect)
