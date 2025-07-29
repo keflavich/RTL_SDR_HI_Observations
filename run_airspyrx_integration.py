@@ -157,8 +157,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         # this is correct: frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
         frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/2)).to(u.MHz)
         frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/2)).to(u.MHz)
-        logging.debug(f'frequency array 1 extrema = {frequency_array1.min():0.3f} MHz, {frequency_array1.max():0.3f} MHz')
-        logging.debug(f'frequency array 2 extrema = {frequency_array2.min():0.3f} MHz, {frequency_array2.max():0.3f} MHz')
+        logging.info(f'frequency array 1 extrema = {frequency_array1.min():0.3f} , {frequency_array1.max():0.3f} ')
+        logging.info(f'frequency array 2 extrema = {frequency_array2.min():0.3f} , {frequency_array2.max():0.3f} ')
         assert frequency_array1.min() > 0, f"frequency_array1.min()={frequency_array1.min()}"
         assert frequency_array2.min() > 0, f"frequency_array2.min()={frequency_array2.min()}"
         # more sanity checks
@@ -171,7 +171,9 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                              frequency1=frequency_array1,
                              frequency2=frequency_array2,
                              meanpower1=meanpower1,
-                             meanpower2=meanpower2, **kwargs)
+                             meanpower2=meanpower2,
+                             ref_frequency=ref_frequency,
+                             **kwargs)
     else:
         frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency).to(u.MHz)
         assert frequency_array.min() > 0, f"frequency_array.min()={frequency_array.min()}"
@@ -292,15 +294,15 @@ def plot_table(filename, ref_frequency=hi_restfreq):
         ax = pl.subplot(2, 1, 1)
         ax.plot(tbl['frequency1'], tbl['meanpower1'], label='meanpower1')
         ax.plot(tbl['frequency2'], tbl['meanpower2'], label='meanpower2')
-        pl.xlabel("Frequency (Hz)")
+        pl.xlabel(f"Frequency [MHz]")
         ax2 = pl.subplot(2, 1, 2)
-        velo = (ref_frequency - u.Quantity(tbl['frequency1'], u.Hz)) / ref_frequency * constants.c
+        velo = (ref_frequency - u.Quantity(tbl['frequency1'], u.MHz)) / ref_frequency * constants.c
         ax2.plot(velo, tbl['spectrum'], label='meanpower1 - meanpower2')
         ax2.set_xlabel("Velocity (km/s)")
     else:
         ax = pl.gca()
         ax.plot(tbl['frequency'], tbl['spectrum'])
-        ax.set_xlabel("Frequency (Hz)")
+        ax.set_xlabel("Frequency [MHz]")
 
     pl.tight_layout()
     outfilename = filename.replace(".fits", "_spectrum.png")
@@ -393,14 +395,17 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     pl.savefig(outfilename, bbox_inches='tight')
 
 
-def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, **kwargs):
+def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, ref_frequency=1420*u.MHz, **kwargs):
 
+    assert np.all(frequency1 > 1.35*u.GHz)
+    assert np.all(frequency1 < 1.5*u.GHz)
+    # only ever use order=1, higher-order biases/shifts the signal very significantly (changes the frequency by >10 MHz)
     if decimate:
-        tbl = Table({'spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate),
-                     'frequency1': scipy.signal.decimate(frequency1, decimate),
-                     'frequency2': scipy.signal.decimate(frequency2, decimate),
-                     'meanpower1': scipy.signal.decimate(meanpower1, decimate),
-                     'meanpower2': scipy.signal.decimate(meanpower2, decimate)
+        tbl = Table({'spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate, n=1),
+                     'frequency1': u.Quantity(scipy.signal.decimate(frequency1, decimate, n=1), frequency1.unit),
+                     'frequency2': u.Quantity(scipy.signal.decimate(frequency2, decimate, n=1), frequency2.unit),
+                     'meanpower1': scipy.signal.decimate(meanpower1, decimate, n=1),
+                     'meanpower2': scipy.signal.decimate(meanpower2, decimate, n=1)
                     })
     else:
         tbl = Table({'spectrum': meanpower1 - meanpower2,
@@ -409,14 +414,17 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
                      'meanpower1': meanpower1,
                      'meanpower2': meanpower2
                     })
+    assert tbl['frequency1'].quantity.max() > ref_frequency
+    assert tbl['frequency1'].quantity.min() < ref_frequency
+    tbl.meta['ref_frequency'] = ref_frequency
     save_tbl(tbl, filename=filename, **kwargs)
 
 
 def save_integration(filename, frequency, meanpower, decimate=False, **kwargs):
 
     if decimate:
-        tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate),
-                     'frequency': scipy.signal.decimate(frequency, decimate)})
+        tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate, n=1),
+                     'frequency': scipy.signal.decimate(frequency, decimate, n=1)})
     else:
         tbl = Table({'spectrum': meanpower, 'frequency': frequency})
 
