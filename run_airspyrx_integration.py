@@ -178,7 +178,10 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         save_integration(filename=savename_fits, frequency=frequency_array, meanpower=meanpower, **kwargs)
 
     if do_waterfall:
-        waterfall_plot(filenames[0], ref_frequency=u.Quantity(frequency_to_tune, u.MHz), samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
+        waterfall_plot(filenames[0],
+                       ref_frequency=u.Quantity(frequency_to_tune, u.MHz),
+                       samplerate=samplerate, fsw_throw=fsw_throw,
+                       dtype=type_to_dtype[type], channel_width=channel_width)
 
     if doplot:
         plot_table(savename_fits)
