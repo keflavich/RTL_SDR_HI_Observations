@@ -155,8 +155,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
     ref_frequency = u.Quantity(ref_frequency, u.Hz)
     if fsw:
         # this is correct: frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
-        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/2)).astype(np.float32)
-        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/2)).astype(np.float32)
+        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/2)).to(u.MHz)
+        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/2)).to(u.MHz)
         logging.debug(f'frequency array 1 extrema = {frequency_array1.min():0.3f} MHz, {frequency_array1.max():0.3f} MHz')
         logging.debug(f'frequency array 2 extrema = {frequency_array2.min():0.3f} MHz, {frequency_array2.max():0.3f} MHz')
         assert frequency_array1.min() > 0, f"frequency_array1.min()={frequency_array1.min()}"
@@ -168,7 +168,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                              meanpower1=meanpower1,
                              meanpower2=meanpower2, **kwargs)
     else:
-        frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency).astype(np.float32)
+        frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency).to(u.MHz)
         assert frequency_array.min() > 0, f"frequency_array.min()={frequency_array.min()}"
         save_integration(filename=savename_fits, frequency=frequency_array, meanpower=meanpower, **kwargs)
 
