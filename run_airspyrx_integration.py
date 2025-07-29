@@ -55,7 +55,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                               sample_time_s=60,
                               n_integrations=10,
                               type=0,
-                              gain=20,
+                              gain=8,
                               lna_gain=14,
                               vga_gain=15,
                               mixer_gain=15,
@@ -192,7 +192,7 @@ def do_calibration_run(fsw=False):
     n_integrations = 2 if fsw else 1
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    for lna_gain in range(0, 16, 5):
+    for lna_gain in range(0, 14, 5):
         for vga_gain in range(0, 16, 5):
             for bias_tee in (0, 1):
                 for mixer_gain in range(0, 16, 5):
@@ -218,7 +218,7 @@ def do_calibration_run(fsw=False):
                                                   )
 
 
-def summarize_calibration_run(fsw=False, starttime=None):
+def summarize_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
     meanpower = {}
 
     for lna_gain in range(0, 16, 5):
@@ -226,29 +226,60 @@ def summarize_calibration_run(fsw=False, starttime=None):
             for bias_tee in (0, 1):
                 for mixer_gain in range(0, 16, 5):
                     for gain in range(0, 21, 5):
-                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+                        try:
+                            tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+                        except Exception as ex:
+                            if allow_missing:
+                                if verbose:
+                                    print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+                                continue
+                            else:
+                                raise ex
                         if fsw:
                             meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = (tb['meanpower1'].mean(), tb['meanpower2'].mean())
                         else:
-                            meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = tb['meanpower'].mean()
+                            meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = tb['spectrum'].mean()
 
     return meanpower
 
 
-def plot_calibration_run(meanpower, fsw=False):
-    for lna_gain, linewidth in zip(range(0, 16, 5), (0.5, 1, 1.5)):
-        for vga_gain, linestyle in zip(range(0, 16, 5), ('-', '--', ':')):
-            for bias_tee, marker in zip((0, 1), ('o', None)):
-                for mixer_gain, redness in zip(range(0, 16, 5), (0, 0.5, 1)):
-                    for gain, greenness in zip(range(0, 21, 5), (0, 0.3333, 0.6666, 1)):
-                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+def plot_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
 
-                        pl.plot(tb['frequency'], tb['meanpower'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}',
-                                linewidth=linewidth, linestyle=linestyle, marker=marker, color=(redness, greenness, 0))
 
-    pl.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    for gain in range(0, 21, 5):
+        fig = pl.figure(figsize=(10, 10), dpi=300)
+        fig.suptitle(f'gain = {gain}')
+        axes = fig.subplots(2, 2)
+        for vga_gain, plotind in zip(range(0, 16, 5), (1, 2, 3, 4)):
+            for lna_gain, linestyle in zip(range(0, 14, 5), ('-', '--', ':', '-.')):
+                for mixer_gain, color in zip(range(0, 16, 5), ('r', 'g', 'b', 'y', 'm', 'c')):
+                    for bias_tee, linewidth in zip((0, 1), (0.5, 1.5)):
+                        try:
+                            tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+                        except Exception as ex:
+                            if allow_missing:
+                                if verbose:
+                                    print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+                                continue
+                            else:
+                                raise ex
+
+                        #color = (color[0], bias_tee, color[1])
+
+                        # legend doesn't work unless you hack it like this to use pyplot
+                        ax = axes.flat[plotind-1]
+                        pl.sca(ax)
+                        if fsw:
+                            pl.semilogy(tb['frequency'], tb['meanpower1'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}', color=color,
+                                    linewidth=linewidth, linestyle=linestyle, )
+                        else:
+                            pl.semilogy(tb['frequency'], tb['spectrum'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}', color=color,
+                                    linewidth=linewidth, linestyle=linestyle, )
+                        ax.set_title(f'vga_gain = {vga_gain}')
+
+        pl.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8)
     pl.tight_layout()
-    pl.savefig(f"1420_integration_calibration_{starttime}.png", bbox_inches='tight')
+    pl.savefig(f"1420_integration_calibration_{starttime}.png", bbox_inches='tight', dpi=300)
 
 def plot_table(filename, ref_frequency=hi_restfreq):
     import pylab as pl
