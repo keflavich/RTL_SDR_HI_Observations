@@ -213,7 +213,6 @@ def do_calibration_run(fsw=False):
 
 
 def summarize_calibration_run(fsw=False, starttime=None):
-    import glob
     meanpower = {}
 
     for lna_gain in range(0, 16, 5):
@@ -229,6 +228,21 @@ def summarize_calibration_run(fsw=False, starttime=None):
 
     return meanpower
 
+
+def plot_calibration_run(meanpower, fsw=False):
+    for lna_gain, linewidth in zip(range(0, 16, 5), (0.5, 1, 1.5)):
+        for vga_gain, linestyle in zip(range(0, 16, 5), ('-', '--', ':')):
+            for bias_tee, marker in zip((0, 1), ('o', None)):
+                for mixer_gain, redness in zip(range(0, 16, 5), (0, 0.5, 1)):
+                    for gain, greenness in zip(range(0, 21, 5), (0, 0.3333, 0.6666, 1)):
+                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+
+                        pl.plot(tb['frequency'], tb['meanpower'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}',
+                                linewidth=linewidth, linestyle=linestyle, marker=marker, color=(redness, greenness, 0))
+
+    pl.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    pl.tight_layout()
+    pl.savefig(f"1420_integration_calibration_{starttime}.png", bbox_inches='tight')
 
 def plot_table(filename, ref_frequency=hi_restfreq):
     import pylab as pl
