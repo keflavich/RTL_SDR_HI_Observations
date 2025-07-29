@@ -133,8 +133,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
                 now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-                logger.log(15, f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  ")
-                logger.info("stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
+                logger.log(25, f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  ")
+                logger.info(f"stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
                 if result.returncode not in (0, 3221225477):
                     logger.error(f"return code {result.returncode} is not good")
             else:
@@ -154,6 +154,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
     fsw_throw = u.Quantity(fsw_throw, u.Hz)
     ref_frequency = u.Quantity(ref_frequency, u.Hz)
     if fsw:
+        # this is correct: frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
         frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/2)).astype(np.float32)
         frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/2)).astype(np.float32)
         logging.debug(f'frequency array 1 extrema = {frequency_array1.min():0.3f} MHz, {frequency_array1.max():0.3f} MHz')
