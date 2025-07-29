@@ -196,13 +196,16 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
 def do_calibration_run(fsw=False):
     n_integrations = 2 if fsw else 1
 
+    n_cals = 3 * 4 * 2 * 4 * 5
+    progress = tqdm.tqdm(desc="Calibration run", total=n_cals)
+
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     for lna_gain in range(0, 14, 5):
         for vga_gain in range(0, 16, 5):
             for bias_tee in (0, 1):
                 for mixer_gain in range(0, 16, 5):
                     for gain in range(0, 21, 5):
-
+                        progress.update(1)
                         run_airspy_rx_integration(sample_time_s=0.05,
                                                   samplerate=int(1e7),
                                                   output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{now}.rx",
