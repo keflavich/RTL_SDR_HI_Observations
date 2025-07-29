@@ -50,7 +50,7 @@ logger = logging.getLogger('AirspyRx')
 
 def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                               fsw=True,
-                              fsw_throw=5*u.MHz,
+                              fsw_throw=2.25*u.MHz,
                               samplerate=int(1e7),
                               sample_time_s=60,
                               n_integrations=10,
@@ -161,6 +161,11 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         logging.debug(f'frequency array 2 extrema = {frequency_array2.min():0.3f} MHz, {frequency_array2.max():0.3f} MHz')
         assert frequency_array1.min() > 0, f"frequency_array1.min()={frequency_array1.min()}"
         assert frequency_array2.min() > 0, f"frequency_array2.min()={frequency_array2.min()}"
+        # more sanity checks
+        assert frequency_array1.min() < ref_frequency
+        assert frequency_array1.max() > ref_frequency
+        assert frequency_array2.min() < ref_frequency
+        assert frequency_array2.max() > ref_frequency
 
         save_fsw_integration(filename=savename_fits,
                              frequency1=frequency_array1,
