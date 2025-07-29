@@ -384,9 +384,11 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     #pl.xlabel("Frequency (MHz)")
     total_time = (data.size / samplerate).decompose().value
     yticks = ax.yaxis.get_ticklocs()
+    ax.set_yticks(yticks)
     ax.set_yticklabels([f'{x/max(yticks) * total_time:.2f} s' for x in yticks])
     ax.set_ylabel("Time")
     xticks = ax.xaxis.get_ticklocs()
+    ax.set_xticks(xticks)
     ax.set_xticklabels([f'{((x-min(xticks))/max(xticks) * freqrange + freq0)/1e6:.2f} MHz' for x in xticks],
                        rotation=30)
     ax.set_xlabel("Frequency (MHz)")
