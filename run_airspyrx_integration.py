@@ -47,9 +47,9 @@ type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
 
-def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
+def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                               fsw=True,
-                              fsw_throw=int(5e6),
+                              fsw_throw=5*u.MHz,
                               samplerate=int(1e7),
                               sample_time_s=60,
                               n_integrations=10,
@@ -103,7 +103,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         t0 = perf_counter()
 
         if fsw:
-            frequency_to_tune = ref_frequency + fsw_throw/1e6/2 * (-1 if ii % 2 == 1 else 1)
+            frequency_to_tune = ref_frequency + fsw_throw/2 * (-1 if ii % 2 == 1 else 1)
         else:
             frequency_to_tune = ref_frequency
 
@@ -111,7 +111,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
 
         nsamples_requested = int(n_samples // n_integrations * extra_sample_buffer)
 
-        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune.to(u.MHz).value:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
 
         isok = False
 
@@ -153,6 +153,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
         frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/2)).astype(np.float32)
         logging.debug(f'frequency array 1 extrema = {frequency_array1.min():0.3f} MHz, {frequency_array1.max():0.3f} MHz')
         logging.debug(f'frequency array 2 extrema = {frequency_array2.min():0.3f} MHz, {frequency_array2.max():0.3f} MHz')
+        assert frequency_array1.min() > 0, f"frequency_array1.min()={frequency_array1.min()}"
+        assert frequency_array2.min() > 0, f"frequency_array2.min()={frequency_array2.min()}"
 
         save_fsw_integration(savename_fits,
                              frequency1=frequency_array1,
@@ -161,6 +163,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq.to(u.MHz).value,
                              meanpower2=meanpower2, **kwargs)
     else:
         frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency).astype(np.float32)
+        assert frequency_array.min() > 0, f"frequency_array.min()={frequency_array.min()}"
         save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
 
     if do_waterfall:
@@ -191,6 +194,8 @@ def plot_table(filename, ref_frequency=hi_restfreq):
         ax = pl.gca()
         ax.plot(tbl['frequency'], tbl['spectrum'])
         ax.set_xlabel("Frequency (Hz)")
+
+    pl.tight_layout()
     outfilename = filename.replace(".fits", "_spectrum.png")
     if not outfilename.endswith(".png"):
         outfilename += ".png"
@@ -253,17 +258,27 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     # fft along axis=1 means that's the frequency axis
     dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
 
-    #rfrq = (ref_frequency + fsw_throw/2)
-    #frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
+    rfrq = (ref_frequency + fsw_throw/2)
+    frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
+    freqrange = (max(frequency) - min(frequency)).decompose().value
+    freq0 = min(frequency).value
 
     pl.clf()
-    pl.imshow(dataft, norm=simple_norm(dataft, stretch='log'))
-    # aspect = data.shape[0] / data.shape[1]
+    ax = pl.gca()
+    im = ax.imshow(dataft, norm=simple_norm(dataft, stretch='log'), origin='lower')
+    aspect = data.shape[1] / data.shape[0]
     # logging.debug(f"aspect={aspect}")
-    # pl.gca().set_aspect(aspect)
+    ax.set_aspect(aspect)
     #pl.xlabel("Frequency (MHz)")
-    #pl.ylabel("Time (s)")
-    pl.colorbar()
+    total_time = (data.size / samplerate).decompose().value
+    yticks = ax.yaxis.get_ticklocs()
+    ax.set_yticklabels([f'{x/max(yticks) * total_time:.2f} s' for x in yticks])
+    ax.set_ylabel("Time")
+    xticks = ax.xaxis.get_ticklocs()
+    ax.set_xticklabels([f'{((x-min(xticks))/max(xticks) * freqrange + freq0)/1e6:.2f} MHz' for x in xticks],
+                       rotation=30)
+    ax.set_xlabel("Frequency (MHz)")
+    pl.colorbar(mappable=im)
 
     outfilename = filename.replace(".rx", "_waterfall.png")
     if not outfilename.endswith(".png"):
