@@ -46,6 +46,7 @@ type_to_dtype = {0: np.complex64, 1: np.float32, 2: np.int16, 3: np.int16, 4: np
 # INT16_IQ is .... super weird, it's integer real, integer imaginary, flipping back and forth - there's no built-in reader for that
 type_to_nchan_mult = {0: 1, 1: 1, 2: 2, 3: 1, 4: 1, 5: 8}
 
+logger = logging.getLogger('AirspyRx')
 
 def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                               fsw=True,
@@ -63,9 +64,10 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                               output_filename="1420_integration.rx",
                               cleanup=True,
                               channel_width=1*u.km/u.s,
-                              sleep_between_integrations=3,
+                              sleep_between_integrations=0.1,
                               extra_sample_buffer=1.01,
                               doplot=True,
+                              retry_on_dropped_samples=True,
                               do_waterfall=False,
                               **kwargs
                              ):
@@ -121,17 +123,20 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
 
             data = np.fromfile(output_filename_thisiter, dtype=type_to_dtype[type])
             # there are always some dropped samples; the requested number has some kinda built-in shortfall
-            if len(data) >= n_samples // n_integrations * 0.9:
+            if (len(data) >= n_samples // n_integrations * 0.9) or not retry_on_dropped_samples:
                 isok = True
             else:
-                print(f"Expected >={n_samples // n_integrations} samples (requested {nsamples_requested}), got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
+                logger.warning(f"Expected >={n_samples // n_integrations} samples (requested {nsamples_requested}), got {len(data)}: dropped samples! took {perf_counter() - t0:.2f} seconds.  Retrying...")
 
         filenames.append(output_filename_thisiter)
 
         if result.returncode != 0:
             if os.path.exists(output_filename_thisiter):
                 now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-                print(f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  (3221225477 is a good return code).  stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
+                logger.log(15, f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode} in {perf_counter() - t0:.2f} seconds.  nsamples_requested={nsamples_requested}.  ")
+                logger.info("stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
+                if result.returncode not in (0, 3221225477):
+                    logger.error(f"return code {result.returncode} is not good")
             else:
                 raise RuntimeError(f"{now} iteration {ii+1} of {n_integrations} of airspy_rx ended with return code {result.returncode}.  stdout+stderr: {result.stdout.decode('utf-8') + result.stderr.decode('utf-8')}")
 
@@ -156,7 +161,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         assert frequency_array1.min() > 0, f"frequency_array1.min()={frequency_array1.min()}"
         assert frequency_array2.min() > 0, f"frequency_array2.min()={frequency_array2.min()}"
 
-        save_fsw_integration(savename_fits,
+        save_fsw_integration(filename=savename_fits,
                              frequency1=frequency_array1,
                              frequency2=frequency_array2,
                              meanpower1=meanpower1,
@@ -164,7 +169,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
     else:
         frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency).astype(np.float32)
         assert frequency_array.min() > 0, f"frequency_array.min()={frequency_array.min()}"
-        save_integration(savename_fits, frequency_array, meanpower=meanpower, **kwargs)
+        save_integration(filename=savename_fits, frequency=frequency_array, meanpower=meanpower, **kwargs)
 
     if do_waterfall:
         waterfall_plot(filenames[0], ref_frequency=u.Quantity(frequency_to_tune, u.MHz), samplerate=samplerate, fsw_throw=fsw_throw, dtype=type_to_dtype[type], channel_width=channel_width)
@@ -175,6 +180,54 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
     if cleanup:
         for filename in filenames:
             os.remove(filename)
+
+
+def do_calibration_run(fsw=False):
+    n_integrations = 2 if fsw else 1
+
+    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    for lna_gain in range(0, 16, 5):
+        for vga_gain in range(0, 16, 5):
+            for bias_tee in (0, 1):
+                for mixer_gain in range(0, 16, 5):
+                    for gain in range(0, 21, 5):
+
+                        run_airspy_rx_integration(sample_time_s=0.05,
+                                                  samplerate=int(1e7),
+                                                  output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{now}.rx",
+                                                  in_memory=False,
+                                                  cleanup=False,
+                                                  gain=gain,
+                                                  lna_gain=lna_gain,
+                                                  vga_gain=vga_gain,
+                                                  mixer_gain=mixer_gain,
+                                                  bias_tee=bias_tee,
+                                                  extra_sample_buffer=1,
+                                                  retry_on_dropped_samples=False,
+                                                  n_integrations=n_integrations,
+                                                  fsw=fsw,
+                                                  do_waterfall=False,
+                                                  doplot=False,
+                                                  sleep_between_integrations=0,
+                                                  )
+
+
+def summarize_calibration_run(fsw=False, starttime=None):
+    import glob
+    meanpower = {}
+
+    for lna_gain in range(0, 16, 5):
+        for vga_gain in range(0, 16, 5):
+            for bias_tee in (0, 1):
+                for mixer_gain in range(0, 16, 5):
+                    for gain in range(0, 21, 5):
+                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
+                        if fsw:
+                            meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = (tb['meanpower1'].mean(), tb['meanpower2'].mean())
+                        else:
+                            meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = tb['meanpower'].mean()
+
+    return meanpower
 
 
 def plot_table(filename, ref_frequency=hi_restfreq):
@@ -321,7 +374,7 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
         try:
             obs_lat, obs_lon, elevation = whereami()
         except Exception as ex:
-            print(f"Unable to determine where you are because {ex}.  Setting lon, lat, elev = 0,0,0")
+            logger.warning(f"Unable to determine where you are because {ex}.  Setting lon, lat, elev = 0,0,0")
             obs_lat, obs_lon, elevation = 0, 0, 0
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
