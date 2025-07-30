@@ -162,6 +162,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         time.sleep(sleep_between_integrations)
 
     if fsw:
+        # ref freq needs to be the same, otherwise the number of channels differs slightly
         meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
         meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
     else:
