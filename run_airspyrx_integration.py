@@ -173,11 +173,12 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                              meanpower1=meanpower1,
                              meanpower2=meanpower2,
                              ref_frequency=ref_frequency,
+                             fsw_throw=fsw_throw,
                              **kwargs)
     else:
         frequency_array = (np.fft.fftshift(np.fft.fftfreq(meanpower.size)) * samplerate + ref_frequency).to(u.MHz)
         assert frequency_array.min() > 0, f"frequency_array.min()={frequency_array.min()}"
-        save_integration(filename=savename_fits, frequency=frequency_array, meanpower=meanpower, **kwargs)
+        save_integration(filename=savename_fits, frequency=frequency_array, meanpower=meanpower, ref_frequency=ref_frequency, **kwargs)
 
     if do_waterfall:
         waterfall_plot(filenames[0],
@@ -341,9 +342,14 @@ def average_integration(filenames, dtype, in_memory=False,
             data = np.fromfile(filename, dtype=dtype)
             datasize = data.size - (data.size % nchan)
             nmeasurements = datasize // nchan
+
+            # reshape such that each row is a single spectrum
             data = data[:datasize].reshape(nmeasurements, nchan)
 
+            # FT along rows to produce a power spectrum
             dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
+
+            # sum across rows, then add to our accumulated sum spectrum
             accum += dataft.sum(axis=0)
             n_samples += nmeasurements
 
@@ -425,7 +431,7 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
     save_tbl(tbl, filename=filename, **kwargs)
 
 
-def save_integration(filename, frequency, meanpower, decimate=False, **kwargs):
+def save_integration(filename, frequency, meanpower, decimate=False, ref_frequency=1420*u.MHz, **kwargs):
 
     if decimate:
         tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate, n=1),
@@ -433,9 +439,10 @@ def save_integration(filename, frequency, meanpower, decimate=False, **kwargs):
     else:
         tbl = Table({'spectrum': meanpower, 'frequency': frequency})
 
+    tbl.meta['ref_frequency'] = ref_frequency
     save_tbl(tbl, filename=filename, **kwargs)
 
-def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6):
+def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude=None, azimuth=None, int_time=6, **kwargs):
 
     if obs_lat is None:
         try:
@@ -457,6 +464,9 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
     tbl.meta['date-obs'] = now
     tbl.meta['mjd-obs'] = now_ap.mjd
     tbl.meta['jd-obs'] = now_ap.jd
+
+    for key, value in kwargs.items():
+        tbl.meta[key] = value
 
     tbl.write(filename)
 
