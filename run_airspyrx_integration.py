@@ -21,6 +21,11 @@ Usage:
 [-h sensivity_gain]: Set sensitivity simplified gain, 0-21
 [-n num_samples]: Number of samples to transfer (default is unlimited)
 [-d]: Verbose mode
+
+
+2025-07-30:
+I'm now interpreting -g and -h to be "simplified" overrides that set the (-v, -m, -l) based on this spreadsheet:
+http://airspy.com/downloads/airspy_gain_modes.xlsx
 """
 
 import pylab as pl
@@ -55,10 +60,11 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
                               sample_time_s=60,
                               n_integrations=10,
                               type=0,
-                              gain=8,
+                              sensitivity_gain=None,
+                              linearity_gain=None,
                               lna_gain=14,
-                              vga_gain=15,
-                              mixer_gain=15,
+                              vga_gain=13,
+                              mixer_gain=12,
                               bias_tee=1,
                               in_memory=None,
                               output_filename="1420_integration.rx",
@@ -117,7 +123,16 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
 
         nsamples_requested = int(n_samples // n_integrations * extra_sample_buffer)
 
-        command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune.to(u.MHz).value:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -h {gain} -l {lna_gain} -d -v {vga_gain} -m {mixer_gain} -b {bias_tee}"
+        if sensitivity_gain is not None:
+            if linearity_gain is not None:
+                raise ValueError("Cannot specify both sensitivity_gain and linearity_gain")
+            command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune.to(u.MHz).value:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -h {sensitivity_gain} -d -b {bias_tee}"
+        elif linearity_gain is not None:
+            command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune.to(u.MHz).value:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -g {linearity_gain}  -d -b {bias_tee}"
+        else:
+            # manual setting mode
+            command = f"airspy_rx -r {output_filename_thisiter} -f {frequency_to_tune.to(u.MHz).value:0.3f} -a {samplerate} -t {type} -n {nsamples_requested} -d -v {vga_gain} -m {mixer_gain} -l {lna_gain} -b {bias_tee}"
+
 
         isok = False
 
@@ -201,7 +216,7 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
 def do_calibration_run(fsw=False):
     n_integrations = 2 if fsw else 1
 
-    n_cals = 3 * 4 * 2 * 4 * 5
+    n_cals = 3 * 4 * 2 * 4
     progress = tqdm.tqdm(desc="Calibration run", total=n_cals)
 
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
@@ -209,26 +224,62 @@ def do_calibration_run(fsw=False):
         for vga_gain in range(0, 16, 5):
             for bias_tee in (0, 1):
                 for mixer_gain in range(0, 16, 5):
-                    for gain in range(0, 21, 5):
-                        progress.update(1)
-                        run_airspy_rx_integration(sample_time_s=0.05,
-                                                  samplerate=int(1e7),
-                                                  output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{now}.rx",
-                                                  in_memory=False,
-                                                  cleanup=False,
-                                                  gain=gain,
-                                                  lna_gain=lna_gain,
-                                                  vga_gain=vga_gain,
-                                                  mixer_gain=mixer_gain,
-                                                  bias_tee=bias_tee,
-                                                  extra_sample_buffer=1,
-                                                  retry_on_dropped_samples=False,
-                                                  n_integrations=n_integrations,
-                                                  fsw=fsw,
-                                                  do_waterfall=False,
-                                                  doplot=False,
-                                                  sleep_between_integrations=0,
-                                                  )
+                    progress.update(1)
+                    run_airspy_rx_integration(sample_time_s=0.05,
+                                                samplerate=int(1e7),
+                                                output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{now}.rx",
+                                                in_memory=False,
+                                                cleanup=False,
+                                                lna_gain=lna_gain,
+                                                vga_gain=vga_gain,
+                                                mixer_gain=mixer_gain,
+                                                bias_tee=bias_tee,
+                                                extra_sample_buffer=1,
+                                                retry_on_dropped_samples=False,
+                                                n_integrations=n_integrations,
+                                                fsw=fsw,
+                                                do_waterfall=False,
+                                                doplot=False,
+                                                sleep_between_integrations=0,
+                                                )
+    for linearity_gain in tqdm(range(0, 21, 2), desc="Linearity gain"):
+        run_airspy_rx_integration(sample_time_s=0.05,
+                                  samplerate=int(1e7),
+                                  output_filename=f"1420_integration_lna{lna_gain}_linearity{linearity_gain}_{now}.rx",
+                                  in_memory=False,
+                                  cleanup=False,
+                                  lna_gain=None,
+                                  vga_gain=None,
+                                  mixer_gain=None,
+                                  linearity_gain=linearity_gain,
+                                  bias_tee=bias_tee,
+                                  extra_sample_buffer=1,
+                                  retry_on_dropped_samples=False,
+                                  n_integrations=n_integrations,
+                                  fsw=fsw,
+                                  do_waterfall=False,
+                                  doplot=False,
+                                  sleep_between_integrations=0,
+                                  )
+    for sensitivity_gain in tqdm(range(0, 21, 2), desc="Sensitivity gain"):
+        run_airspy_rx_integration(sample_time_s=0.05,
+                                  samplerate=int(1e7),
+                                  output_filename=f"1420_integration_lna{lna_gain}_sensitivity{sensitivity_gain}_{now}.rx",
+                                  in_memory=False,
+                                  cleanup=False,
+                                  lna_gain=None,
+                                  vga_gain=None,
+                                  mixer_gain=None,
+                                  sensitivity_gain=sensitivity_gain,
+                                  bias_tee=bias_tee,
+                                  extra_sample_buffer=1,
+                                  retry_on_dropped_samples=False,
+                                  n_integrations=n_integrations,
+                                  fsw=fsw,
+                                  do_waterfall=False,
+                                  doplot=False,
+                                  sleep_between_integrations=0,
+                                  )
 
 
 def summarize_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
@@ -238,61 +289,58 @@ def summarize_calibration_run(fsw=False, starttime=None, allow_missing=False, ve
         for vga_gain in range(0, 16, 5):
             for bias_tee in (0, 1):
                 for mixer_gain in range(0, 16, 5):
-                    for gain in range(0, 21, 5):
-                        try:
-                            tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
-                        except Exception as ex:
-                            if allow_missing:
-                                if verbose:
-                                    print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
-                                continue
-                            else:
-                                raise ex
-                        if fsw:
-                            meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = (tb['meanpower1'].mean(), tb['meanpower2'].mean())
+                    try:
+                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
+                    except Exception as ex:
+                        if allow_missing:
+                            if verbose:
+                                print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
+                            continue
                         else:
-                            meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = tb['spectrum'].mean()
+                            raise ex
+                    if fsw:
+                        meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = (tb['meanpower1'].mean(), tb['meanpower2'].mean())
+                    else:
+                        meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = tb['spectrum'].mean()
 
     return meanpower
 
 
 def plot_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
 
-
-    for gain in range(0, 21, 5):
-        fig = pl.figure(figsize=(10, 10), dpi=300)
-        fig.suptitle(f'gain = {gain}')
-        axes = fig.subplots(2, 2)
-        for vga_gain, plotind in zip(range(0, 16, 5), (1, 2, 3, 4)):
-            for lna_gain, linestyle in zip(range(0, 14, 5), ('-', '--', ':', '-.')):
-                for mixer_gain, color in zip(range(0, 16, 5), ('r', 'g', 'b', 'y', 'm', 'c')):
-                    for bias_tee, linewidth in zip((0, 1), (0.5, 1.5)):
-                        try:
-                            tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
-                        except Exception as ex:
-                            if allow_missing:
-                                if verbose:
-                                    print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}_{starttime}.fits")
-                                continue
-                            else:
-                                raise ex
-
-                        #color = (color[0], bias_tee, color[1])
-
-                        # legend doesn't work unless you hack it like this to use pyplot
-                        ax = axes.flat[plotind-1]
-                        pl.sca(ax)
-                        if fsw:
-                            pl.semilogy(tb['frequency'], tb['meanpower1'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}', color=color,
-                                    linewidth=linewidth, linestyle=linestyle, )
+    fig = pl.figure(figsize=(10, 10), dpi=300)
+    axes = fig.subplots(2, 2)
+    for vga_gain, plotind in zip(range(0, 16, 5), (1, 2, 3, 4)):
+        for lna_gain, linestyle in zip(range(0, 14, 5), ('-', '--', ':', '-.')):
+            for mixer_gain, color in zip(range(0, 16, 5), ('r', 'g', 'b', 'y', 'm', 'c')):
+                for bias_tee, linewidth in zip((0, 1), (0.5, 1.5)):
+                    try:
+                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
+                    except Exception as ex:
+                        if allow_missing:
+                            if verbose:
+                                print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
+                            continue
                         else:
-                            pl.semilogy(tb['frequency'], tb['spectrum'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_gain{gain}', color=color,
-                                    linewidth=linewidth, linestyle=linestyle, )
-                        ax.set_title(f'vga_gain = {vga_gain}')
+                            raise ex
 
-        pl.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8)
+                    #color = (color[0], bias_tee, color[1])
+
+                    # legend doesn't work unless you hack it like this to use pyplot
+                    ax = axes.flat[plotind-1]
+                    pl.sca(ax)
+                    if fsw:
+                        pl.semilogy(tb['frequency'], tb['meanpower1'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}', color=color,
+                                linewidth=linewidth, linestyle=linestyle, )
+                    else:
+                        pl.semilogy(tb['frequency'], tb['spectrum'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}', color=color,
+                                linewidth=linewidth, linestyle=linestyle, )
+                    ax.set_title(f'vga_gain = {vga_gain}')
+
+    pl.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8)
     pl.tight_layout()
     pl.savefig(f"1420_integration_calibration_{starttime}.png", bbox_inches='tight', dpi=300)
+
 
 def plot_table(filename, ref_frequency=hi_restfreq):
     import pylab as pl
