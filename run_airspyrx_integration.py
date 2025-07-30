@@ -162,8 +162,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         time.sleep(sleep_between_integrations)
 
     if fsw:
-        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency1)
-        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency2)
+        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
+        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
     else:
         meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
 
