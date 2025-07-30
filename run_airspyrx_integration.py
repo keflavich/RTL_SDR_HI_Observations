@@ -99,13 +99,17 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         # do it in-memory if the file is less than 2GB
         in_memory = n_samples * bytes_per_sample < (2 * 1024**3)
 
+    if fsw:
+        ref_frequency1 = ref_frequency + fsw_throw/2
+        ref_frequency2 = ref_frequency - fsw_throw/2
+
     filenames = []
     for ii in range(n_integrations):
         output_filename_thisiter = f"{output_filename}_{ii}"
         t0 = perf_counter()
 
         if fsw:
-            frequency_to_tune = ref_frequency + fsw_throw/2 * (-1 if ii % 2 == 1 else 1)
+            frequency_to_tune = ref_frequency1 if ii % 2 == 0 else ref_frequency2
         else:
             frequency_to_tune = ref_frequency
 
@@ -143,10 +147,10 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
         time.sleep(sleep_between_integrations)
 
     if fsw:
-        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type])
-        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type])
+        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency1)
+        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency2)
     else:
-        meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[type])
+        meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
 
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
@@ -155,8 +159,8 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
     ref_frequency = u.Quantity(ref_frequency, u.Hz)
     if fsw:
         # this is correct: frequency = (np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate + rfrq).astype(np.float32)
-        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + (ref_frequency + fsw_throw/2)).to(u.MHz)
-        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + (ref_frequency - fsw_throw/2)).to(u.MHz)
+        frequency_array1 = (np.fft.fftshift(np.fft.fftfreq(meanpower1.size)) * samplerate + ref_frequency1).to(u.MHz)
+        frequency_array2 = (np.fft.fftshift(np.fft.fftfreq(meanpower2.size)) * samplerate + ref_frequency2).to(u.MHz)
         logging.info(f'frequency array 1 extrema = {frequency_array1.min():0.3f} , {frequency_array1.max():0.3f} ')
         logging.info(f'frequency array 2 extrema = {frequency_array2.min():0.3f} , {frequency_array2.max():0.3f} ')
         assert frequency_array1.min() > 0, f"frequency_array1.min()={frequency_array1.min()}"
@@ -317,14 +321,14 @@ def plot_table(filename, ref_frequency=hi_restfreq):
 
 def average_integration(filenames, dtype, in_memory=False,
                         channel_width=1*u.km/u.s,
-                        samplerate=1e7, ref_frequency=1420*u.MHz):
+                        samplerate=1e7, ref_frequency=hi_restfreq):
     """
     Compute the power spectrum and average over time
     """
 
     pbar = tqdm.tqdm(desc="Averaging integration")
 
-    nchan = int(((samplerate*u.Hz / ref_frequency * constants.c) / channel_width).decompose())
+    nchan = int(((u.Quantity(samplerate, u.Hz) / ref_frequency * constants.c) / channel_width).decompose())
 
     if in_memory:
         data = np.concatenate([(np.fromfile(filename, dtype=dtype))
@@ -358,7 +362,7 @@ def average_integration(filenames, dtype, in_memory=False,
     return np.abs(meanpower)
 
 
-def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw=5e6, dtype=np.complex64, channel_width=1*u.km/u.s):
+def waterfall_plot(filename, ref_frequency=hi_restfreq, samplerate=1e7, fsw_throw=5e6, dtype=np.complex64, channel_width=1*u.km/u.s):
     import pylab as pl
     from astropy.visualization import simple_norm
 
@@ -406,10 +410,8 @@ def waterfall_plot(filename, ref_frequency=1420*u.MHz, samplerate=1e7, fsw_throw
     pl.savefig(outfilename, bbox_inches='tight')
 
 
-def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, ref_frequency=1420*u.MHz, **kwargs):
+def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, ref_frequency=hi_restfreq, **kwargs):
 
-    assert np.all(frequency1 > 1.35*u.GHz)
-    assert np.all(frequency1 < 1.5*u.GHz)
     # only ever use order=1, higher-order biases/shifts the signal very significantly (changes the frequency by >10 MHz)
     if decimate:
         tbl = Table({'spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate, n=1),
@@ -431,7 +433,7 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
     save_tbl(tbl, filename=filename, **kwargs)
 
 
-def save_integration(filename, frequency, meanpower, decimate=False, ref_frequency=1420*u.MHz, **kwargs):
+def save_integration(filename, frequency, meanpower, decimate=False, ref_frequency=hi_restfreq, **kwargs):
 
     if decimate:
         tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate, n=1),
