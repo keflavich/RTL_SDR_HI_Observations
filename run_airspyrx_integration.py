@@ -214,73 +214,80 @@ def run_airspy_rx_integration(ref_frequency=hi_restfreq,
             os.remove(filename)
 
 
-def do_calibration_run(fsw=False):
+def do_calibration_run(fsw=False, do_only_packaged_gains=False):
     n_integrations = 2 if fsw else 1
 
     n_cals = 3 * 4 * 2 * 4
     progress = tqdm.tqdm(desc="Calibration run", total=n_cals)
 
-    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    for lna_gain in range(0, 14, 5):
-        for vga_gain in range(0, 16, 5):
-            for bias_tee in (0, 1):
-                for mixer_gain in range(0, 16, 5):
-                    progress.update(1)
-                    run_airspy_rx_integration(sample_time_s=0.05,
-                                                samplerate=int(1e7),
-                                                output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{now}.rx",
-                                                in_memory=False,
-                                                cleanup=False,
-                                                lna_gain=lna_gain,
-                                                vga_gain=vga_gain,
-                                                mixer_gain=mixer_gain,
-                                                bias_tee=bias_tee,
-                                                extra_sample_buffer=1,
-                                                retry_on_dropped_samples=False,
-                                                n_integrations=n_integrations,
-                                                fsw=fsw,
-                                                do_waterfall=False,
-                                                doplot=False,
-                                                sleep_between_integrations=0,
+    if not do_only_packaged_gains:
+        now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+        for lna_gain in range(0, 14, 5):
+            for vga_gain in range(0, 16, 5):
+                for bias_tee in (0, 1):
+                    for mixer_gain in range(0, 16, 5):
+                        progress.update(1)
+                        run_airspy_rx_integration(sample_time_s=0.05,
+                                                    samplerate=int(1e7),
+                                                    output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{now}.rx",
+                                                    in_memory=False,
+                                                    cleanup=False,
+                                                    lna_gain=lna_gain,
+                                                    vga_gain=vga_gain,
+                                                    mixer_gain=mixer_gain,
+                                                    bias_tee=bias_tee,
+                                                    extra_sample_buffer=1,
+                                                    retry_on_dropped_samples=False,
+                                                    n_integrations=n_integrations,
+                                                    fsw=fsw,
+                                                    do_waterfall=False,
+                                                    doplot=False,
+                                                    sleep_between_integrations=0,
                                                 )
-    for linearity_gain in tqdm(range(0, 21, 2), desc="Linearity gain"):
-        run_airspy_rx_integration(sample_time_s=0.05,
-                                  samplerate=int(1e7),
-                                  output_filename=f"1420_integration_lna{lna_gain}_linearity{linearity_gain}_{now}.rx",
-                                  in_memory=False,
-                                  cleanup=False,
-                                  lna_gain=None,
-                                  vga_gain=None,
-                                  mixer_gain=None,
-                                  linearity_gain=linearity_gain,
-                                  bias_tee=bias_tee,
-                                  extra_sample_buffer=1,
-                                  retry_on_dropped_samples=False,
-                                  n_integrations=n_integrations,
-                                  fsw=fsw,
-                                  do_waterfall=False,
-                                  doplot=False,
-                                  sleep_between_integrations=0,
-                                  )
-    for sensitivity_gain in tqdm(range(0, 21, 2), desc="Sensitivity gain"):
-        run_airspy_rx_integration(sample_time_s=0.05,
-                                  samplerate=int(1e7),
-                                  output_filename=f"1420_integration_lna{lna_gain}_sensitivity{sensitivity_gain}_{now}.rx",
-                                  in_memory=False,
-                                  cleanup=False,
-                                  lna_gain=None,
-                                  vga_gain=None,
-                                  mixer_gain=None,
-                                  sensitivity_gain=sensitivity_gain,
-                                  bias_tee=bias_tee,
-                                  extra_sample_buffer=1,
-                                  retry_on_dropped_samples=False,
-                                  n_integrations=n_integrations,
-                                  fsw=fsw,
-                                  do_waterfall=False,
-                                  doplot=False,
-                                  sleep_between_integrations=0,
-                                  )
+
+    for bias_tee in (0,1):
+        for linearity_gain in tqdm.tqdm(range(0, 21, 2), desc="Linearity gain"):
+            now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+
+            run_airspy_rx_integration(sample_time_s=0.05,
+                                      samplerate=int(1e7),
+                                      output_filename=f"1420_integration_linearity{linearity_gain}_{now}.rx",
+                                      in_memory=False,
+                                      cleanup=False,
+                                      lna_gain=None,
+                                      vga_gain=None,
+                                      mixer_gain=None,
+                                      linearity_gain=linearity_gain,
+                                      bias_tee=bias_tee,
+                                      extra_sample_buffer=1,
+                                      retry_on_dropped_samples=False,
+                                      n_integrations=n_integrations,
+                                      fsw=fsw,
+                                      do_waterfall=False,
+                                      doplot=False,
+                                      sleep_between_integrations=0,
+                                      )
+        for sensitivity_gain in tqdm.tqdm(range(0, 21, 2), desc="Sensitivity gain"):
+            now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+
+            run_airspy_rx_integration(sample_time_s=0.05,
+                                      samplerate=int(1e7),
+                                      output_filename=f"1420_integration]_sensitivity{sensitivity_gain}_{now}.rx",
+                                      in_memory=False,
+                                      cleanup=False,
+                                      lna_gain=None,
+                                      vga_gain=None,
+                                      mixer_gain=None,
+                                      sensitivity_gain=sensitivity_gain,
+                                      bias_tee=bias_tee,
+                                      extra_sample_buffer=1,
+                                      retry_on_dropped_samples=False,
+                                      n_integrations=n_integrations,
+                                      fsw=fsw,
+                                      do_waterfall=False,
+                                      doplot=False,
+                                      sleep_between_integrations=0,
+                                      )
 
 
 def summarize_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
