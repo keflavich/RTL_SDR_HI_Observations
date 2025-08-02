@@ -272,7 +272,7 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
 
             run_airspy_rx_integration(sample_time_s=0.05,
                                       samplerate=int(1e7),
-                                      output_filename=f"1420_integration]_sensitivity{sensitivity_gain}_{now}.rx",
+                                      output_filename=f"1420_integration_sensitivity{sensitivity_gain}_{now}.rx",
                                       in_memory=False,
                                       cleanup=False,
                                       lna_gain=None,
