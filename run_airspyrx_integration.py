@@ -539,6 +539,53 @@ def whereami():
     return lat, lon, resp.json()['results'][0]['elevation']
 
 
+import specutils
+import specutils.fitting
+import specutils.manipulation
+from specutils.manipulation.extract_spectral_region import _subregion_to_edge_pixels
+from specutils import SpectralRegion, Spectrum
+from astropy.table import Table
+from astropy.wcs import WCS
+from astropy import units as u
+from astropy.stats import sigma_clip
+
+hi_restfreq = 1420.405751786*u.MHz
+
+def read_and_baseline(filename, polyorder=3, sigma=8):
+    tbl = Table.read(filename)
+    meta = tbl.meta
+    data = tbl['spectrum']
+    #data = tbl['meanpower1']
+    wcs = WCS()
+    wcs.wcs.crval[0] = tbl['frequency1'][0]
+    wcs.wcs.cdelt[0] = tbl['frequency1'][1] - tbl['frequency1'][0]
+    wcs.wcs.crpix[0] = 1
+    wcs.wcs.cunit[0] = 'MHz'
+    wcs.wcs.ctype[0] = 'FREQ'
+    wcs.wcs.restfrq = hi_restfreq.to(u.Hz).value
+
+    spectrum = Spectrum(flux=u.Quantity(data), wcs=wcs, meta=meta, velocity_convention='radio')
+    def v_to_f(v):
+        return spectrum.frequency[np.argmin(np.abs(spectrum.velocity - v))]
+
+    left_pix, right_pix = _subregion_to_edge_pixels(SpectralRegion(v_to_f(-900*u.km/u.s), v_to_f(900*u.km/u.s)).subregions[0], spectrum)
+    spectrum = Spectrum(flux=spectrum.flux[left_pix:right_pix], wcs=spectrum.wcs[left_pix:right_pix], meta=spectrum.meta, velocity_convention='radio')
+
+    # 3rd order polyfit (works much better than poly1d, which fails)
+    mod = np.polyval(np.polyfit(np.arange(spectrum.shape[0]), spectrum.flux, polyorder), np.arange(spectrum.shape[0]))
+    spectrum = Spectrum(spectrum.flux - mod, wcs=spectrum.wcs, meta=spectrum.meta, velocity_convention='radio')
+
+    clipped_flux = sigma_clip(spectrum.flux, sigma=sigma, cenfunc='median', stdfunc='std', masked=False, axis=0)
+
+    spectrum = Spectrum(flux=u.Quantity(clipped_flux), wcs=spectrum.wcs, meta=spectrum.meta, velocity_convention='radio')
+
+    ok = np.isfinite(spectrum.flux)
+    mod = np.polyval(np.polyfit(np.arange(spectrum.shape[0])[ok], spectrum.flux[ok], polyorder), np.arange(spectrum.shape[0]))
+    spectrum = Spectrum(spectrum.flux - mod, wcs=spectrum.wcs, meta=spectrum.meta, velocity_convention='radio')
+
+    return spectrum
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
