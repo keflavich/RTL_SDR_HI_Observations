@@ -2,6 +2,7 @@
 Run an sdrplay integration using SoapySDR
 """
 
+import warnings
 import pylab as pl
 import subprocess
 import logging
@@ -47,6 +48,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               do_waterfall=False,
                               bandwidth='max',
                               channel=0,
+                              verbose=False,
                               **kwargs
                              ):
     """
@@ -64,7 +66,13 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
     fsw_throw is the difference in frequency between the two frequencies when
     doing frequency switching.
     """
-    sdr = SoapySDR.Device(driver="sdrplay")
+    if verbose:
+        SoapySDR.setLogLevel(SoapySDR.SOAPY_SDR_INFO)
+        logger.setLevel(logging.INFO)
+    else:
+        SoapySDR.setLogLevel(SoapySDR.SOAPY_SDR_ERROR)
+        logger.setLevel(logging.ERROR)
+    sdr = SoapySDR.Device({'driver':"sdrplay"})
     bandwidth_range = [x.maximum() for x in sdr.getBandwidthRange(RX, channel)]
     samplerate_range = [x.maximum() for x in sdr.getSampleRateRange(RX, channel)]
     if samplerate > max(samplerate_range):
@@ -94,7 +102,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
         ref_frequency1 = ref_frequency + fsw_throw/2
         ref_frequency2 = ref_frequency - fsw_throw/2
 
-    buff = np.zeros(n_samples, numpy.complex64)
+    buff = np.zeros(n_samples, np.complex64)
 
     filenames = []
     for ii in range(n_integrations):
@@ -113,7 +121,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
         sdr.setGain(RX, channel, 'IFDR', if_gain)
 
         sdr.setSampleRate(RX, channel, samplerate)
-        sdr.setFrequency(RX, channel, frequency_to_tune.to(uHz).value)
+        sdr.setFrequency(RX, channel, frequency_to_tune.to(u.Hz).value)
         sdr.setBandwidth(RX, channel, bandwidth)
 
         rxStream = sdr.setupStream(RX, CF32)
@@ -125,7 +133,10 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
 
         np.save(output_filename_thisiter, buff)
 
-        filenames.append(output_filename_thisiter)
+        sdr.deactivateStream(rxStream)
+        sdr.closeStream(rxStream)
+
+        filenames.append(output_filename_thisiter + '.npy')
 
         # reset buffer
         buff[:] = 0
@@ -134,28 +145,28 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
             time.sleep(sleep_between_integrations)
 
     meta = {
-        'ref_frequency': ref_frequency,
-        'samplerate': samplerate,
-        'channel_width': channel_width,
-        'n_integrations': n_integrations,
+        'REFFREQ': ref_frequency.to(u.Hz).value,
+        'RATE': samplerate,
+        'CHANWID': (channel_width.value, channel_width.unit.to_string()),
+        'N_INT': n_integrations,
         'if_gain': if_gain,
         'rf_gain': rf_gain,
         'bias_tee': bias_tee,
-        'bandwidth': bandwidth,
-        'rx_channel': channel,
+        'bandwid': bandwidth,
+        'rx_chan': channel,
         'nchan': nchan,
-        'n_samples': n_samples,
+        'nsamples': n_samples,
     }
 
     if fsw:
         # ref freq needs to be the same, otherwise the number of channels differs slightly
-        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
-        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
-        meta['fsw_throw'] = fsw_throw
-        meta['ref_frequency1'] = ref_frequency1
-        meta['ref_frequency2'] = ref_frequency2
+        meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[CF32], ref_frequency=ref_frequency, nchan=nchan)
+        meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[CF32], ref_frequency=ref_frequency, nchan=nchan)
+        meta['fswthrow'] = fsw_throw.to(u.Hz).value
+        meta['reffreq1'] = ref_frequency1.to(u.Hz).value
+        meta['reffreq2'] = ref_frequency2.to(u.Hz).value
     else:
-        meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[type], ref_frequency=ref_frequency)
+        meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[CF32], ref_frequency=ref_frequency, nchan=nchan)
 
     savename_fits = output_filename.replace(".rx", ".fits")
     assert savename_fits.endswith(".fits")
@@ -194,7 +205,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
         waterfall_plot(filenames[0],
                        ref_frequency=u.Quantity(frequency_to_tune, u.MHz),
                        samplerate=samplerate, fsw_throw=fsw_throw,
-                       dtype=type_to_dtype[type], channel_width=channel_width)
+                       dtype=type_to_dtype[CF32], channel_width=channel_width)
 
     if doplot:
         plot_table(savename_fits)
@@ -217,7 +228,7 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
                 for bias_tee in (0, 1):
                     for mixer_gain in range(0, 16, 5):
                         progress.update(1)
-                        run_airspy_rx_integration(sample_time_s=0.05,
+                        run_sdrplay_integration(sample_time_s=0.05,
                                                     samplerate=int(1e7),
                                                     output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{now}.rx",
                                                     in_memory=False,
@@ -239,7 +250,7 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
         for linearity_gain in tqdm.tqdm(range(0, 21, 2), desc="Linearity gain"):
             now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
 
-            run_airspy_rx_integration(sample_time_s=0.05,
+            run_sdrplay_integration(sample_time_s=0.05,
                                       samplerate=int(1e7),
                                       output_filename=f"1420_integration_linearity{linearity_gain}_{now}.rx",
                                       in_memory=False,
@@ -260,7 +271,7 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
         for sensitivity_gain in tqdm.tqdm(range(0, 21, 2), desc="Sensitivity gain"):
             now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
 
-            run_airspy_rx_integration(sample_time_s=0.05,
+            run_sdrplay_integration(sample_time_s=0.05,
                                       samplerate=int(1e7),
                                       output_filename=f"1420_integration_sensitivity{sensitivity_gain}_{now}.rx",
                                       in_memory=False,
@@ -367,6 +378,7 @@ def plot_table(filename, ref_frequency=hi_restfreq):
 
 def average_integration(filenames, dtype, in_memory=False,
                         channel_width=1*u.km/u.s,
+                        nchan=None,
                         samplerate=1e7, ref_frequency=hi_restfreq):
     """
     Compute the power spectrum and average over time
@@ -374,36 +386,43 @@ def average_integration(filenames, dtype, in_memory=False,
 
     pbar = tqdm.tqdm(desc="Averaging integration")
 
-    nchan = int(((u.Quantity(samplerate, u.Hz) / ref_frequency * constants.c) / channel_width).decompose())
-
     if in_memory:
-        data = np.concatenate([(np.fromfile(filename, dtype=dtype))
+        data = np.concatenate([(np.load(filename))
                                 for filename in filenames])
         datasize = data.size - (data.size % nchan)
         data = data[:datasize].reshape(datasize//nchan, nchan)
 
-        dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+            # ignore overflow warnings
+            dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
         meanpower = dataft.mean(axis=0)
     else:
         accum = np.zeros(nchan, dtype=dtype)
         n_samples = 0
         for filename in filenames:
             pbar.update(1)
-            data = np.fromfile(filename, dtype=dtype)
+            data = np.load(filename)
             datasize = data.size - (data.size % nchan)
             nmeasurements = datasize // nchan
 
             # reshape such that each row is a single spectrum
             data = data[:datasize].reshape(nmeasurements, nchan)
 
-            # FT along rows to produce a power spectrum
-            dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                # ignore overflow warnings
+                # FT along rows to produce a power spectrum
+                dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
 
             # sum across rows, then add to our accumulated sum spectrum
             accum += dataft.sum(axis=0)
             n_samples += nmeasurements
 
-        meanpower = accum / n_samples
+        assert n_samples > 0
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            meanpower = accum / n_samples
 
     return np.abs(meanpower)
 
@@ -456,7 +475,7 @@ def waterfall_plot(filename, ref_frequency=hi_restfreq, samplerate=1e7, fsw_thro
     pl.savefig(outfilename, bbox_inches='tight')
 
 
-def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, ref_frequency=hi_restfreq, **kwargs):
+def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower2, decimate=False, ref_frequency=hi_restfreq, meta={}, **kwargs):
 
     # only ever use order=1, higher-order biases/shifts the signal very significantly (changes the frequency by >10 MHz)
     if decimate:
@@ -475,11 +494,12 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
                     })
     assert tbl['frequency1'].quantity.max() > ref_frequency
     assert tbl['frequency1'].quantity.min() < ref_frequency
-    tbl.meta['ref_frequency'] = ref_frequency
+    tbl.meta['REFFREQ'] = ref_frequency.to(u.Hz).value
+    tbl.meta.update(meta)
     save_tbl(tbl, filename=filename, **kwargs)
 
 
-def save_integration(filename, frequency, meanpower, decimate=False, ref_frequency=hi_restfreq, meta=meta, **kwargs):
+def save_integration(filename, frequency, meanpower, decimate=False, ref_frequency=hi_restfreq, meta={}, **kwargs):
 
     if decimate:
         tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate, n=1),
@@ -487,7 +507,7 @@ def save_integration(filename, frequency, meanpower, decimate=False, ref_frequen
     else:
         tbl = Table({'spectrum': meanpower, 'frequency': frequency})
 
-    tbl.meta['ref_frequency'] = ref_frequency
+    tbl.meta['REFFREQ'] = ref_frequency.to(u.Hz).value
     tbl.meta.update(meta)
     save_tbl(tbl, filename=filename, **kwargs)
 
@@ -503,11 +523,11 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
     now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     now_ap = Time.now()
 
-    tbl.meta['obs_lat'] = obs_lat
-    tbl.meta['obs_lon'] = obs_lon
-    tbl.meta['altitude'] = altitude
-    tbl.meta['elevation'] = elevation
-    tbl.meta['azimuth'] = azimuth
+    tbl.meta['LATITUDE'] = obs_lat
+    tbl.meta['LONGITUD'] = obs_lon
+    tbl.meta['SITEELEV'] = elevation
+    tbl.meta['altitude'] = (altitude, "Observed altitude (deg)")
+    tbl.meta['azimuth'] = (azimuth, "Observed azimuth (deg)")
 
     tbl.meta['tint'] = int_time
     tbl.meta['date-obs'] = now
@@ -515,9 +535,17 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
     tbl.meta['jd-obs'] = now_ap.jd
 
     for key, value in kwargs.items():
-        tbl.meta[key] = value
+        if len(key) > 8:
+            key = key.replace("_", "")[:8]
+        if hasattr(value, 'to'):
+            value = value.to(u.Hz).value
+        if key != 'meta':
+            tbl.meta[key] = value
 
-    tbl.write(filename)
+    with warnings.catch_warnings():
+        warnings.simplefilter('error')
+        #warnings.simplefilter("ignore", astropy.warnings.VerifyWarning)
+        tbl.write(filename)
 
 
 def whereami():
@@ -580,8 +608,8 @@ def read_and_baseline(filename, polyorder=3, sigma=8):
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    # now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    # run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=5)
+    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    run_sdrplay_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=False)
 
     # now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     #run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=True, decimate=5)
