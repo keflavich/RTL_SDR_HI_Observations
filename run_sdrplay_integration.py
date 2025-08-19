@@ -216,155 +216,22 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
             os.remove(filename)
 
 
-def do_calibration_run(fsw=False, do_only_packaged_gains=False):
-    n_integrations = 2 if fsw else 1
-
-    n_cals = 3 * 4 * 2 * 4
-    progress = tqdm.tqdm(desc="Calibration run", total=n_cals)
-
-    if not do_only_packaged_gains:
-        now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-        for lna_gain in range(0, 14, 5):
-            for vga_gain in range(0, 16, 5):
-                for bias_tee in (0, 1):
-                    for mixer_gain in range(0, 16, 5):
-                        progress.update(1)
-                        run_sdrplay_integration(sample_time_s=0.05,
-                                                    samplerate=int(1e7),
-                                                    output_filename=f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{now}.rx",
-                                                    in_memory=False,
-                                                    cleanup=False,
-                                                    lna_gain=lna_gain,
-                                                    vga_gain=vga_gain,
-                                                    mixer_gain=mixer_gain,
-                                                    bias_tee=bias_tee,
-                                                    retry_on_dropped_samples=False,
-                                                    n_integrations=n_integrations,
-                                                    fsw=fsw,
-                                                    do_waterfall=False,
-                                                    doplot=False,
-                                                    sleep_between_integrations=0,
-                                                )
-
-    for bias_tee in (0,1):
-        for linearity_gain in tqdm.tqdm(range(0, 21, 2), desc="Linearity gain"):
-            now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-
-            run_sdrplay_integration(sample_time_s=0.05,
-                                      samplerate=int(1e7),
-                                      output_filename=f"1420_integration_linearity{linearity_gain}_{now}.rx",
-                                      in_memory=False,
-                                      cleanup=False,
-                                      lna_gain=None,
-                                      vga_gain=None,
-                                      mixer_gain=None,
-                                      linearity_gain=linearity_gain,
-                                      bias_tee=bias_tee,
-                                      retry_on_dropped_samples=False,
-                                      n_integrations=n_integrations,
-                                      fsw=fsw,
-                                      do_waterfall=False,
-                                      doplot=False,
-                                      sleep_between_integrations=0,
-                                      )
-        for sensitivity_gain in tqdm.tqdm(range(0, 21, 2), desc="Sensitivity gain"):
-            now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-
-            run_sdrplay_integration(sample_time_s=0.05,
-                                      samplerate=int(1e7),
-                                      output_filename=f"1420_integration_sensitivity{sensitivity_gain}_{now}.rx",
-                                      in_memory=False,
-                                      cleanup=False,
-                                      lna_gain=None,
-                                      vga_gain=None,
-                                      mixer_gain=None,
-                                      sensitivity_gain=sensitivity_gain,
-                                      bias_tee=bias_tee,
-                                      retry_on_dropped_samples=False,
-                                      n_integrations=n_integrations,
-                                      fsw=fsw,
-                                      do_waterfall=False,
-                                      doplot=False,
-                                      sleep_between_integrations=0,
-                                      )
-
-
-def summarize_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
-    meanpower = {}
-
-    for lna_gain in range(0, 16, 5):
-        for vga_gain in range(0, 16, 5):
-            for bias_tee in (0, 1):
-                for mixer_gain in range(0, 16, 5):
-                    try:
-                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
-                    except Exception as ex:
-                        if allow_missing:
-                            if verbose:
-                                print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
-                            continue
-                        else:
-                            raise ex
-                    if fsw:
-                        meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = (tb['meanpower1'].mean(), tb['meanpower2'].mean())
-                    else:
-                        meanpower[lna_gain, vga_gain, bias_tee, mixer_gain, gain] = tb['spectrum'].mean()
-
-    return meanpower
-
-
-def plot_calibration_run(fsw=False, starttime=None, allow_missing=False, verbose=True):
-
-    fig = pl.figure(figsize=(10, 10), dpi=300)
-    axes = fig.subplots(2, 2)
-    for vga_gain, plotind in zip(range(0, 16, 5), (1, 2, 3, 4)):
-        for lna_gain, linestyle in zip(range(0, 14, 5), ('-', '--', ':', '-.')):
-            for mixer_gain, color in zip(range(0, 16, 5), ('r', 'g', 'b', 'y', 'm', 'c')):
-                for bias_tee, linewidth in zip((0, 1), (0.5, 1.5)):
-                    try:
-                        tb = Table.read(f"1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
-                    except Exception as ex:
-                        if allow_missing:
-                            if verbose:
-                                print(f"{ex}: Missing file 1420_integration_lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}_{starttime}.fits")
-                            continue
-                        else:
-                            raise ex
-
-                    #color = (color[0], bias_tee, color[1])
-
-                    # legend doesn't work unless you hack it like this to use pyplot
-                    ax = axes.flat[plotind-1]
-                    pl.sca(ax)
-                    if fsw:
-                        pl.semilogy(tb['frequency'], tb['meanpower1'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}', color=color,
-                                linewidth=linewidth, linestyle=linestyle, )
-                    else:
-                        pl.semilogy(tb['frequency'], tb['spectrum'], label=f'lna{lna_gain}_vga{vga_gain}_bias{bias_tee}_mixer{mixer_gain}', color=color,
-                                linewidth=linewidth, linestyle=linestyle, )
-                    ax.set_title(f'vga_gain = {vga_gain}')
-
-    pl.legend(loc='upper left', bbox_to_anchor=(1, 1), fontsize=8)
-    pl.tight_layout()
-    pl.savefig(f"1420_integration_calibration_{starttime}.png", bbox_inches='tight', dpi=300)
-
-
 def plot_table(filename, ref_frequency=hi_restfreq):
     import pylab as pl
     pl.clf()
     tbl = Table.read(filename)
-    if 'meanpower1' in tbl.colnames and 'meanpower2' in tbl.colnames:
+    if 'power1' in tbl.colnames and 'power2' in tbl.colnames:
         ax = pl.subplot(2, 1, 1)
-        ax.plot(tbl['frequency1'], tbl['meanpower1'], label='meanpower1')
-        ax.plot(tbl['frequency2'], tbl['meanpower2'], label='meanpower2')
+        ax.plot(tbl['frequency1'], tbl['power1'], label='power1')
+        ax.plot(tbl['frequency2'], tbl['power2'], label='power2')
         pl.xlabel(f"Frequency [MHz]")
         ax2 = pl.subplot(2, 1, 2)
         velo = (ref_frequency - u.Quantity(tbl['frequency1'], u.MHz)) / ref_frequency * constants.c
-        ax2.plot(velo, tbl['spectrum'], label='meanpower1 - meanpower2')
+        ax2.plot(velo, tbl['fsw_spectrum'], label='fsw_spectrum')
         ax2.set_xlabel("Velocity (km/s)")
     else:
         ax = pl.gca()
-        ax.plot(tbl['frequency'], tbl['spectrum'])
+        ax.plot(tbl['frequency'], tbl['power'])
         ax.set_xlabel("Frequency [MHz]")
 
     pl.tight_layout()
