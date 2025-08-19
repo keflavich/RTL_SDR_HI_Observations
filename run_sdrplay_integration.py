@@ -29,6 +29,7 @@ logger = logging.getLogger('SdrPlay')
 type_to_dtype = {CF32: np.complex64}
 
 def run_sdrplay_integration(ref_frequency=hi_restfreq,
+                              obs_type='',
                               fsw=True,
                               fsw_throw=2.25*u.MHz,
                               samplerate=int(1e7),
@@ -42,7 +43,6 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               cleanup=True,
                               channel_width=1*u.km/u.s,
                               sleep_between_integrations=0.0,
-                              extra_sample_buffer=1.01,
                               doplot=True,
                               retry_on_dropped_samples=True,
                               do_waterfall=False,
@@ -145,6 +145,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
             time.sleep(sleep_between_integrations)
 
     meta = {
+        'obs_type': obs_type,
         'REFFREQ': ref_frequency.to(u.Hz).value,
         'RATE': samplerate,
         'CHANWID': (channel_width.value, channel_width.unit.to_string()),
@@ -237,7 +238,6 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
                                                     vga_gain=vga_gain,
                                                     mixer_gain=mixer_gain,
                                                     bias_tee=bias_tee,
-                                                    extra_sample_buffer=1,
                                                     retry_on_dropped_samples=False,
                                                     n_integrations=n_integrations,
                                                     fsw=fsw,
@@ -260,7 +260,6 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
                                       mixer_gain=None,
                                       linearity_gain=linearity_gain,
                                       bias_tee=bias_tee,
-                                      extra_sample_buffer=1,
                                       retry_on_dropped_samples=False,
                                       n_integrations=n_integrations,
                                       fsw=fsw,
@@ -281,7 +280,6 @@ def do_calibration_run(fsw=False, do_only_packaged_gains=False):
                                       mixer_gain=None,
                                       sensitivity_gain=sensitivity_gain,
                                       bias_tee=bias_tee,
-                                      extra_sample_buffer=1,
                                       retry_on_dropped_samples=False,
                                       n_integrations=n_integrations,
                                       fsw=fsw,
@@ -479,18 +477,18 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
 
     # only ever use order=1, higher-order biases/shifts the signal very significantly (changes the frequency by >10 MHz)
     if decimate:
-        tbl = Table({'spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate, n=1),
+        tbl = Table({'fsw_spectrum': scipy.signal.decimate(meanpower1 - meanpower2, decimate, n=1),
                      'frequency1': u.Quantity(scipy.signal.decimate(frequency1, decimate, n=1), frequency1.unit),
                      'frequency2': u.Quantity(scipy.signal.decimate(frequency2, decimate, n=1), frequency2.unit),
-                     'meanpower1': scipy.signal.decimate(meanpower1, decimate, n=1),
-                     'meanpower2': scipy.signal.decimate(meanpower2, decimate, n=1)
+                     'power1': scipy.signal.decimate(meanpower1, decimate, n=1),
+                     'power2': scipy.signal.decimate(meanpower2, decimate, n=1)
                     })
     else:
-        tbl = Table({'spectrum': meanpower1 - meanpower2,
+        tbl = Table({'fsw_spectrum': meanpower1 - meanpower2,
                      'frequency1': frequency1,
                      'frequency2': frequency2,
-                     'meanpower1': meanpower1,
-                     'meanpower2': meanpower2
+                     'power1': meanpower1,
+                     'power2': meanpower2
                     })
     assert tbl['frequency1'].quantity.max() > ref_frequency
     assert tbl['frequency1'].quantity.min() < ref_frequency
@@ -502,10 +500,10 @@ def save_fsw_integration(filename, frequency1, frequency2, meanpower1, meanpower
 def save_integration(filename, frequency, meanpower, decimate=False, ref_frequency=hi_restfreq, meta={}, **kwargs):
 
     if decimate:
-        tbl = Table({'spectrum': scipy.signal.decimate(meanpower, decimate, n=1),
+        tbl = Table({'power': scipy.signal.decimate(meanpower, decimate, n=1),
                      'frequency': scipy.signal.decimate(frequency, decimate, n=1)})
     else:
-        tbl = Table({'spectrum': meanpower, 'frequency': frequency})
+        tbl = Table({'power': meanpower, 'frequency': frequency})
 
     tbl.meta['REFFREQ'] = ref_frequency.to(u.Hz).value
     tbl.meta.update(meta)
@@ -605,11 +603,127 @@ def read_and_baseline(filename, polyorder=3, sigma=8):
     return spectrum
 
 
+noaa_freqs = [162.400, 162.425, 162.450, 162.475, 162.500, 162.525, 162.550]*u.MHz
+# https://www.weather.gov/nwr/sites?site=WXJ60
+#https://www.weather.gov/nwr/stations?State=FL
+noaa_freq = 162.475*u.MHz
+
+def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u.MHz,
+                      integrations_per_pass=50,
+                      passes=20, max_offset=300, default_offset=0, plot=False, verbose=False):
+    """
+    Calibrate the SDRPlay using a known NOAA weather station.
+
+    Parameters
+    ----------
+    device_index : int
+        The USB ID of the device.  Usually 0, sometimes 1.
+    calibrator_freq : Quantity, MHz
+        The frequency of the weather station.  The active one in Gainesville is
+        preselected.
+    bandwidth : Quantity, MHz
+        The bandwidth of the observation to obtain.  Generally limited to <2.4
+        MHz.  Will be used to set the sample rate of the SDR.
+    passes : int
+        Number of passes (single-integrations) to average prior to measuring
+        the offset
+    max_offset : int
+        The maximum offset to search for, in parts-per-million.  This is set
+        to avoid possibly detecting other (RFI) signals in-band.  Generally
+        you want this to be less than the default_offset to avoid the "total power"
+        spike at the center.
+    default_offset : int
+        The default offset to use when measuring the frequency offset.  A
+        nonzero offset is needed to avoid having the signal channel landing on
+        the central DC channel, which generally does not have a good
+        measurement
+    """
+    if verbose:
+        SoapySDR.setLogLevel(SoapySDR.SOAPY_SDR_INFO)
+        logger.setLevel(logging.INFO)
+    else:
+        SoapySDR.setLogLevel(SoapySDR.SOAPY_SDR_ERROR)
+        logger.setLevel(logging.ERROR)
+
+
+    sdr = SoapySDR.Device({'driver':"sdrplay"})
+
+    numsamples = 2**15
+    samplerate = 0.125e6*u.Hz
+
+    sdr.setSampleRate(RX, device_index, samplerate.to(u.Hz).value)
+    sdr.setFrequency(RX, device_index, calibrator_freq.to(u.Hz).value)
+    sdr.setBandwidth(RX, device_index, bandwidth.to(u.Hz).value)
+
+
+    pses = []
+
+    frq = np.fft.fftfreq(numsamples)
+    idx = np.argsort(frq)
+
+    buffer = np.zeros(numsamples * integrations_per_pass, dtype=np.complex64)
+
+    for ii in tqdm.tqdm(range(passes), desc="Calibrating on NOAA"):
+        sdr.setFrequency(RX, device_index, calibrator_freq.to(u.Hz).value)
+
+        rxStream = sdr.setupStream(RX, CF32)
+        sdr.activateStream(rxStream) #start streaming
+        sr = sdr.readStream(rxStream, [buffer], len(buffer))
+        sdr.deactivateStream(rxStream)
+        sdr.closeStream(rxStream)
+
+        ps = (np.abs(np.fft.fft(buffer.reshape(integrations_per_pass, numsamples), axis=1))**2).mean(axis=0)
+
+        # this seems to be an unneeded hack
+        # (but it might help avoid a spike at 0-offset?)
+        #ps[0] = np.mean(ps)
+        pses.append(ps[idx])
+
+    pses = np.array(pses)
+    mean_ps = np.mean(pses, axis=0)
+
+    frequency = (np.fft.fftshift(frq) * samplerate + calibrator_freq).to(u.MHz)
+
+    cutout = ((frequency > calibrator_freq*(1-max_offset/1e6)) &
+              (frequency < calibrator_freq*(1+max_offset/1e6)))
+
+    max_ind = np.argmax(mean_ps[cutout])
+    meas_freq = frequency[cutout][max_ind]
+    meas_offset = (meas_freq - calibrator_freq) / calibrator_freq
+
+    print()
+    print(f"Selected frequency={sdr.getFrequency(RX, device_index)}")
+    print(f"Measured frequency={meas_freq}")
+    print(f"Measured frequency offset is {meas_offset.decompose().value*1e6} parts per million (ppm)")
+
+    if plot:
+        pl.clf()
+        pl.plot(frequency.value, mean_ps)
+        pl.plot(frequency[cutout].value, mean_ps[cutout], color='k', linewidth=2)
+        pl.plot(frequency[cutout].value, pses[:, cutout].T)
+        pl.xlim(frequency[cutout].min().value, frequency[cutout].max().value)
+        pl.show()
+
+    return frequency, mean_ps, meas_freq, meas_offset.decompose()
+
+
+def bias_tee_on(device_index=0):
+    sdr = SoapySDR.Device({'driver': 'sdrplay'})
+    sdr.setBiasTee(RX, device_index, True)
+
+
+def bias_tee_off(device_index=0):
+    sdr = SoapySDR.Device({'driver': 'sdrplay'})
+    sdr.setBiasTee(RX, device_index, False)
+
+
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO)
 
-    now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
-    run_sdrplay_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=False)
+    calibrate_on_noaa(plot=True)
+
+    # now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
+    # run_sdrplay_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=False, decimate=False)
 
     # now = str(datetime.datetime.now().strftime("%y%m%d_%H%M%S"))
     #run_airspy_rx_integration(sample_time_s=2, output_filename=f"1420_integration_{now}.rx", in_memory=True, decimate=5)
