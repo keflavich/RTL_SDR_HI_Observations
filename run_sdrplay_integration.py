@@ -427,7 +427,7 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
         warnings.simplefilter('error')
         #warnings.simplefilter("ignore", astropy.warnings.VerifyWarning)
         if os.path.exists(filename):
-            print(f"File {filename} already exists.  Renaming to {filename.replace('.fits', f'_{now}.fits')}")
+            print(f"File {filename} already exists.  Saving as {filename.replace('.fits', f'_{now}.fits')}")
             filename = filename.replace(".fits", f"_{now}.fits")
         tbl.write(filename)
 
@@ -607,7 +607,6 @@ def bias_tee_on(device_index=0, sleep_time=1):
 def bias_tee_off(device_index=0):
     sdr = load_sdrplay_device()
     sdr.writeSetting("biasT_ctrl", False)
-
 
 
 if __name__ == "__main__":
