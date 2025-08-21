@@ -588,6 +588,8 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
         pl.plot(frequency[cutout].value, mean_ps[cutout], color='k', linewidth=2)
         pl.plot(frequency[cutout].value, pses[:, cutout].T)
         pl.xlim(frequency[cutout].min().value, frequency[cutout].max().value)
+        pl.xlabel("Frequency (MHz)")
+        pl.ylabel("Power (arbitrary units)")
         pl.show()
 
     return frequency, mean_ps, meas_freq, meas_offset.decompose()
