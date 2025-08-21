@@ -8,7 +8,7 @@ import subprocess
 import logging
 from astropy import units as u
 import numpy as np
-import tqdm
+from tqdm.auto import tqdm
 import time
 import datetime
 import scipy.signal
@@ -29,11 +29,14 @@ logger = logging.getLogger('SdrPlay')
 type_to_dtype = {CF32: np.complex64}
 
 
-def load_sdrplay_device():
+def load_sdrplay_device(antenna='B'):
     try:
         sdr = SoapySDR.Device({'driver': 'sdrplay'})
     except RuntimeError:
         sdr = SoapySDR.Device()
+
+    sdr.setAntenna(RX, 0, f"Antenna {antenna}")
+
     return sdr
 
 
@@ -43,7 +46,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               fsw_throw=2.25*u.MHz,
                               samplerate=int(1e7),
                               sample_time_s=60,
-                              n_integrations=10,
+                              n_integrations=2,
                               if_gain=59,
                               rf_gain=27,
                               bias_tee=True,
@@ -93,6 +96,11 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
         if bandwidth > max(bandwidth_range):
             raise ValueError(f"Bandwidth {bandwidth} is too high for this device")
 
+    if fsw and n_integrations < 2:
+        raise ValueError("n_integrations must be at least 2 for frequency switching.  Either increase n_integrations or set fsw=False")
+    if fsw and n_integrations % 2 == 1:
+        raise ValueError("n_integrations must be even for frequency switching.")
+
     nchan = int(((u.Quantity(bandwidth, u.Hz) / ref_frequency * constants.c) / channel_width).decompose())
     nchan = scipy.fftpack.next_fast_len(nchan)
 
@@ -114,9 +122,8 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
     buff = np.zeros(n_samples, np.complex64)
 
     filenames = []
-    for ii in range(n_integrations):
+    for ii in tqdm(range(n_integrations), desc="Integrating"):
         output_filename_thisiter = f"{output_filename}_{ii}"
-        t0 = perf_counter()
 
         if fsw:
             frequency_to_tune = ref_frequency1 if ii % 2 == 0 else ref_frequency2
@@ -258,7 +265,7 @@ def average_integration(filenames, dtype, in_memory=False,
     Compute the power spectrum and average over time
     """
 
-    pbar = tqdm.tqdm(desc="Averaging integration")
+    pbar = tqdm(desc="Averaging integration")
 
     if in_memory:
         data = np.concatenate([(np.load(filename))
@@ -419,6 +426,9 @@ def save_tbl(tbl, filename, obs_lat=None, obs_lon=None, elevation=None, altitude
     with warnings.catch_warnings():
         warnings.simplefilter('error')
         #warnings.simplefilter("ignore", astropy.warnings.VerifyWarning)
+        if os.path.exists(filename):
+            print(f"File {filename} already exists.  Renaming to {filename.replace('.fits', f'_{now}.fits')}")
+            filename = filename.replace(".fits", f"_{now}.fits")
         tbl.write(filename)
 
 
@@ -539,7 +549,7 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
 
     buffer = np.zeros(numsamples * integrations_per_pass, dtype=np.complex64)
 
-    for ii in tqdm.tqdm(range(passes), desc="Calibrating on NOAA"):
+    for ii in tqdm(range(passes), desc="Calibrating on NOAA"):
         sdr.setFrequency(RX, device_index, calibrator_freq.to(u.Hz).value)
 
         rxStream = sdr.setupStream(RX, CF32)
@@ -583,14 +593,16 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
     return frequency, mean_ps, meas_freq, meas_offset.decompose()
 
 
-def bias_tee_on(device_index=0):
+def bias_tee_on(device_index=0, sleep_time=1):
     sdr = load_sdrplay_device()
-    sdr.setBiasTee(RX, device_index, True)
+    sdr.writeSetting("biasT_ctrl", True)
 
 
-def bias_tee_off(device_index=0):
-    sdr = load_sdrplay_device()
-    sdr.setBiasTee(RX, device_index, False)
+    rxStream = sdr.setupStream(RX, CF32)
+    sdr.activateStream(rxStream) #start streaming
+    time.sleep(sleep_time)
+    sdr.deactivateStream(rxStream)
+    sdr.closeStream(rxStream)
 
 
 if __name__ == "__main__":
