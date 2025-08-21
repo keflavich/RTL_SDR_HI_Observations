@@ -597,12 +597,17 @@ def bias_tee_on(device_index=0, sleep_time=1):
     sdr = load_sdrplay_device()
     sdr.writeSetting("biasT_ctrl", True)
 
-
     rxStream = sdr.setupStream(RX, CF32)
     sdr.activateStream(rxStream) #start streaming
     time.sleep(sleep_time)
     sdr.deactivateStream(rxStream)
     sdr.closeStream(rxStream)
+
+
+def bias_tee_off(device_index=0):
+    sdr = load_sdrplay_device()
+    sdr.writeSetting("biasT_ctrl", False)
+
 
 
 if __name__ == "__main__":
