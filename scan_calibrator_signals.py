@@ -1,3 +1,4 @@
+raise NotImplementedError("This script is deprecated in AST4723 in 2025.  Use run_sdrplay_integration.py instead.")
 import numpy as np
 from rtlsdr import RtlSdr
 from astropy import units as u
