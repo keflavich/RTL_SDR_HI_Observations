@@ -28,6 +28,15 @@ logger = logging.getLogger('SdrPlay')
 
 type_to_dtype = {CF32: np.complex64}
 
+
+def load_sdrplay_device():
+    try:
+        sdr = SoapySDR.Device({'driver': 'sdrplay'})
+    except RuntimeError:
+        sdr = SoapySDR.Device()
+    return sdr
+
+
 def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               obs_type='',
                               fsw=True,
@@ -72,7 +81,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
     else:
         SoapySDR.setLogLevel(SoapySDR.SOAPY_SDR_ERROR)
         logger.setLevel(logging.ERROR)
-    sdr = SoapySDR.Device({'driver':"sdrplay"})
+    sdr = load_sdrplay_device()
     bandwidth_range = [x.maximum() for x in sdr.getBandwidthRange(RX, channel)]
     samplerate_range = [x.maximum() for x in sdr.getSampleRateRange(RX, channel)]
     if samplerate > max(samplerate_range):
@@ -302,7 +311,7 @@ def waterfall_plot(filename, ref_frequency=hi_restfreq, samplerate=1e7, fsw_thro
 
     nchan = int(((samplerate / ref_frequency * constants.c) / channel_width).decompose())
 
-    data = np.fromfile(filename, dtype=dtype)
+    data = np.load(filename)
     datasize = data.size - (data.size % nchan)
     nmeasurements = datasize // nchan
     data = data[:datasize].reshape(nmeasurements, nchan)
@@ -513,7 +522,7 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
         logger.setLevel(logging.ERROR)
 
 
-    sdr = SoapySDR.Device({'driver':"sdrplay"})
+    sdr = load_sdrplay_device()
 
     numsamples = 2**15
     samplerate = 0.125e6*u.Hz
@@ -575,12 +584,12 @@ def calibrate_on_noaa(device_index=0, calibrator_freq=noaa_freq, bandwidth=1.0*u
 
 
 def bias_tee_on(device_index=0):
-    sdr = SoapySDR.Device({'driver': 'sdrplay'})
+    sdr = load_sdrplay_device()
     sdr.setBiasTee(RX, device_index, True)
 
 
 def bias_tee_off(device_index=0):
-    sdr = SoapySDR.Device({'driver': 'sdrplay'})
+    sdr = load_sdrplay_device()
     sdr.setBiasTee(RX, device_index, False)
 
 
