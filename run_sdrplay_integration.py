@@ -177,12 +177,14 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
 
     if fsw:
         # ref freq needs to be the same, otherwise the number of channels differs slightly
+        # Edited by Claude -- PR #2 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
         meanpower1 = average_integration(filenames[::2], samplerate=samplerate, dtype=type_to_dtype[CF32], ref_frequency=ref_frequency, nchan=nchan, in_memory=in_memory)
         meanpower2 = average_integration(filenames[1::2], samplerate=samplerate, dtype=type_to_dtype[CF32], ref_frequency=ref_frequency, nchan=nchan, in_memory=in_memory)
         meta['fswthrow'] = fsw_throw.to(u.Hz).value
         meta['reffreq1'] = ref_frequency1.to(u.Hz).value
         meta['reffreq2'] = ref_frequency2.to(u.Hz).value
     else:
+        # Edited by Claude -- PR #2 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
         meanpower = average_integration(filenames, samplerate=samplerate, dtype=type_to_dtype[CF32], ref_frequency=ref_frequency, nchan=nchan, in_memory=in_memory)
 
     savename_fits = output_filename.replace(".rx", ".fits")
@@ -264,6 +266,9 @@ def average_integration(filenames, dtype, in_memory=False,
     """
     Compute the power spectrum and average over time
 
+    Edited by Claude -- PR #2 --
+    https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+
     ``dtype`` is the on-disk sample type; it is deliberately *not* used for the
     accumulator, which is always float64 (see below).
     """
@@ -280,8 +285,10 @@ def average_integration(filenames, dtype, in_memory=False,
             warnings.simplefilter("ignore")
             # ignore overflow warnings
             dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
+        # Edited by Claude -- PR #2 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
         meanpower = dataft.mean(axis=0, dtype=np.float64)
     else:
+        # Edited by Claude -- PR #2 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
         # Accumulate in float64.  This used to be ``dtype`` (complex64), i.e. a
         # complex accumulator holding what is always a real power spectrum:
         # np.fft.fft promotes to complex128, so dataft is already float64 and
@@ -308,6 +315,7 @@ def average_integration(filenames, dtype, in_memory=False,
                 dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
 
             # sum across rows, then add to our accumulated sum spectrum
+            # Edited by Claude -- PR #2 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
             accum += dataft.sum(axis=0, dtype=np.float64)
             n_samples += nmeasurements
 
@@ -316,6 +324,7 @@ def average_integration(filenames, dtype, in_memory=False,
             warnings.simplefilter("error")
             meanpower = accum / n_samples
 
+    # Edited by Claude -- PR #2 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     # meanpower is a real power spectrum in both branches, so np.abs() is a
     # no-op here.  It only ever did anything because ``accum`` was complex,
     # which silently discarded a (spurious) imaginary part.
