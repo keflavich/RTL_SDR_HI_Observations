@@ -40,6 +40,60 @@ def load_sdrplay_device(antenna='B'):
     return sdr
 
 
+# Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+def read_stream_into(sdr, rxStream, buff, timeout_us=1000000,
+                     max_consecutive_failures=10):
+    """
+    Fill ``buff`` completely with samples from ``rxStream``.
+
+    ``readStream`` returns at most one transfer (``getStreamMTU``) worth of
+    samples per call, which is many orders of magnitude smaller than a
+    multi-second integration.  Calling it once and assuming the whole buffer
+    was filled leaves the remainder of the buffer as zeros, which are then
+    FFT'd and averaged in as zero-power spectra, diluting the result by an
+    essentially arbitrary factor.
+
+    Returns
+    -------
+    n_read : int
+        Number of samples written into ``buff`` (equal to ``buff.size``
+        unless an exception was raised).
+    n_overflow : int
+        Number of overflow (dropped-sample) events reported by the device.
+    """
+    n_read = 0
+    n_overflow = 0
+    n_failures = 0
+
+    while n_read < buff.size:
+        sr = sdr.readStream(rxStream, [buff[n_read:]], buff.size - n_read,
+                            timeoutUs=timeout_us)
+
+        if sr.ret > 0:
+            n_read += sr.ret
+            n_failures = 0
+        elif sr.ret == SoapySDR.SOAPY_SDR_OVERFLOW:
+            # the device dropped samples; the ones we already have are still
+            # valid, so keep reading but record that this integration is
+            # not contiguous
+            n_overflow += 1
+            n_failures = 0
+        elif sr.ret == SoapySDR.SOAPY_SDR_TIMEOUT or sr.ret == 0:
+            n_failures += 1
+            if n_failures >= max_consecutive_failures:
+                raise RuntimeError(
+                    f"readStream timed out {n_failures} times in a row after "
+                    f"{n_read}/{buff.size} samples.  The device is not "
+                    f"producing data.")
+        else:
+            raise RuntimeError(
+                f"readStream failed with code {sr.ret} "
+                f"({SoapySDR.errToStr(sr.ret)}) after {n_read}/{buff.size} "
+                f"samples")
+
+    return n_read, n_overflow
+
+
 def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               obs_type='',
                               fsw=True,
@@ -57,6 +111,11 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               sleep_between_integrations=0.0,
                               doplot=True,
                               retry_on_dropped_samples=True,
+                              # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+                              max_read_retries=3,
+                              dummy_read=True,
+                              dummy_read_time_s=1.0,
+                              warmup_time_s=0.05,
                               do_waterfall=False,
                               bandwidth='max',
                               channel=0,
@@ -77,6 +136,24 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
 
     fsw_throw is the difference in frequency between the two frequencies when
     doing frequency switching.
+
+    Edited by Claude -- PR #1 --
+    https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+
+    ``dummy_read`` performs one throwaway acquisition before the integration
+    loop starts and discards it.  This matters for frequency switching: the
+    even-numbered integrations are the frequency-1 integrations, so integration
+    0 -- the only one taken on a freshly-configured, cold device -- always ends
+    up in ``power1`` and never in ``power2``.  Any start-up transient (bias-tee
+    LNA power-up, AGC settling, the device re-initialization triggered by the
+    first ``setSampleRate``/``setBandwidth`` call) therefore biases ``power1``
+    only, which shows up as a spurious difference between ``power1`` and
+    ``power2`` and hence a residual in the ``fsw_spectrum``.  With the default
+    ``n_integrations=2`` that transient is 100% of ``power1``.
+
+    ``warmup_time_s`` additionally discards a short read at the start of each
+    individual integration, since the stream is torn down and re-activated
+    every time round the loop.
     """
     if verbose:
         SoapySDR.setLogLevel(SoapySDR.SOAPY_SDR_INFO)
@@ -120,6 +197,51 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
         ref_frequency2 = ref_frequency - fsw_throw/2
 
     buff = np.zeros(n_samples, np.complex64)
+    warmup_buff = np.zeros(max(int(samplerate * warmup_time_s), 1), np.complex64)
+
+    # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+    # Configure the device once, up front, rather than once per integration.
+    # setSampleRate and setBandwidth only actually change anything on the first
+    # pass (afterwards they are no-ops), and on SDRplay a rate/bandwidth change
+    # re-initializes the device, which can discard the gains that were set just
+    # before it.  Leaving this inside the loop means integration 0 -- always a
+    # frequency-1 integration -- is potentially recorded at a different gain
+    # than every other integration.
+    sdr.writeSetting("biasT_ctrl", bias_tee)
+    sdr.setSampleRate(RX, channel, samplerate)
+    sdr.setBandwidth(RX, channel, bandwidth)
+    sdr.setGain(RX, channel, 'RFDR', rf_gain)
+    sdr.setGain(RX, channel, 'IFDR', if_gain)
+
+    if fsw:
+        first_frequency = ref_frequency1
+    else:
+        first_frequency = ref_frequency
+
+    # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+    if dummy_read:
+        # Throw away a full acquisition before recording anything.  This is the
+        # fix for the power1-vs-power2 asymmetry: the cold-start transient (the
+        # bias-tee LNA spinning up, the AGC settling, the LO settling after the
+        # first tune) lands entirely in integration 0, and integration 0 is
+        # always a frequency-1 integration.  Discarding it means every recorded
+        # integration sees the same warmed-up device.
+        logger.info(f"Dummy (discarded) read of {dummy_read_time_s} s at "
+                    f"{first_frequency:0.3f} to let the device settle")
+        sdr.setFrequency(RX, channel, first_frequency.to(u.Hz).value)
+
+        dummy_buff = np.zeros(max(int(samplerate * dummy_read_time_s), 1),
+                              np.complex64)
+        rxStream = sdr.setupStream(RX, CF32)
+        sdr.activateStream(rxStream)
+        try:
+            n_read, n_overflow = read_stream_into(sdr, rxStream, dummy_buff)
+            logger.info(f"Dummy read returned {n_read} samples with "
+                        f"{n_overflow} overflow events; discarding them")
+        finally:
+            sdr.deactivateStream(rxStream)
+            sdr.closeStream(rxStream)
+        del dummy_buff
 
     filenames = []
     for ii in tqdm(range(n_integrations), desc="Integrating"):
@@ -132,30 +254,45 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
 
         logging.debug(f"Tuning to {frequency_to_tune:0.3f} MHz")
 
-        sdr.writeSetting("biasT_ctrl", bias_tee)
-        sdr.setGain(RX, channel, 'RFDR', rf_gain)
-        sdr.setGain(RX, channel, 'IFDR', if_gain)
-
-        sdr.setSampleRate(RX, channel, samplerate)
         sdr.setFrequency(RX, channel, frequency_to_tune.to(u.Hz).value)
-        sdr.setBandwidth(RX, channel, bandwidth)
 
-        rxStream = sdr.setupStream(RX, CF32)
-        sdr.activateStream(rxStream) #start streaming
+        # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
+        n_attempts = max_read_retries if retry_on_dropped_samples else 1
+        for attempt in range(n_attempts):
+            buff[:] = 0
 
-        sr = sdr.readStream(rxStream, [buff], len(buff))
-        if verbose:
-            print(f'return code: {sr.ret} flags: {sr.flags} timeNs: {sr.timeNs}')
+            rxStream = sdr.setupStream(RX, CF32)
+            sdr.activateStream(rxStream) #start streaming
+            try:
+                # the stream is re-activated every iteration, so discard the
+                # first few samples to skip the stream start-up transient
+                if warmup_buff.size > 1:
+                    read_stream_into(sdr, rxStream, warmup_buff)
+
+                n_read, n_overflow = read_stream_into(sdr, rxStream, buff)
+            finally:
+                sdr.deactivateStream(rxStream)
+                sdr.closeStream(rxStream)
+
+            if verbose:
+                print(f'read {n_read}/{buff.size} samples with '
+                      f'{n_overflow} overflow events')
+
+            if n_overflow == 0:
+                break
+            elif attempt < n_attempts - 1:
+                logger.warning(f"Integration {ii} had {n_overflow} overflow "
+                               f"events (dropped samples); retrying "
+                               f"({attempt + 1}/{n_attempts})")
+        else:
+            if n_overflow > 0:
+                logger.warning(f"Integration {ii} still had {n_overflow} "
+                               f"overflow events after {n_attempts} attempts; "
+                               f"keeping it anyway")
 
         np.save(output_filename_thisiter, buff)
 
-        sdr.deactivateStream(rxStream)
-        sdr.closeStream(rxStream)
-
         filenames.append(output_filename_thisiter + '.npy')
-
-        # reset buffer
-        buff[:] = 0
 
         if sleep_between_integrations > 0:
             time.sleep(sleep_between_integrations)
