@@ -40,6 +40,7 @@ def load_sdrplay_device(antenna='B'):
     return sdr
 
 
+# Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
 def read_stream_into(sdr, rxStream, buff, timeout_us=1000000,
                      max_consecutive_failures=10):
     """
@@ -110,6 +111,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
                               sleep_between_integrations=0.0,
                               doplot=True,
                               retry_on_dropped_samples=True,
+                              # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
                               max_read_retries=3,
                               dummy_read=True,
                               dummy_read_time_s=1.0,
@@ -134,6 +136,9 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
 
     fsw_throw is the difference in frequency between the two frequencies when
     doing frequency switching.
+
+    Edited by Claude -- PR #1 --
+    https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
 
     ``dummy_read`` performs one throwaway acquisition before the integration
     loop starts and discards it.  This matters for frequency switching: the
@@ -194,6 +199,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
     buff = np.zeros(n_samples, np.complex64)
     warmup_buff = np.zeros(max(int(samplerate * warmup_time_s), 1), np.complex64)
 
+    # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     # Configure the device once, up front, rather than once per integration.
     # setSampleRate and setBandwidth only actually change anything on the first
     # pass (afterwards they are no-ops), and on SDRplay a rate/bandwidth change
@@ -212,6 +218,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
     else:
         first_frequency = ref_frequency
 
+    # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     if dummy_read:
         # Throw away a full acquisition before recording anything.  This is the
         # fix for the power1-vs-power2 asymmetry: the cold-start transient (the
@@ -249,6 +256,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
 
         sdr.setFrequency(RX, channel, frequency_to_tune.to(u.Hz).value)
 
+        # Edited by Claude -- PR #1 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
         n_attempts = max_read_retries if retry_on_dropped_samples else 1
         for attempt in range(n_attempts):
             buff[:] = 0
