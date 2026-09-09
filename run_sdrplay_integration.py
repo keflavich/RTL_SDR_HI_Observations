@@ -218,6 +218,7 @@ def run_sdrplay_integration(ref_frequency=hi_restfreq,
         assert frequency_array.min() > 0, f"frequency_array.min()={frequency_array.min()}"
         save_integration(filename=savename_fits, frequency=frequency_array, meanpower=meanpower, ref_frequency=ref_frequency, meta=meta, **kwargs)
 
+    # Edited by Claude -- PR #3 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     if do_waterfall:
         # filenames[0] is integration 0, which is tuned to ref_frequency1 when
         # frequency switching.  This used to pass `frequency_to_tune`, which
@@ -313,10 +314,14 @@ def average_integration(filenames, dtype, in_memory=False,
     return np.abs(meanpower)
 
 
+# Edited by Claude -- PR #3 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
 def waterfall_plot(filename, tuned_frequency=hi_restfreq, samplerate=1e7,
                    nchan=None, dtype=np.complex64, channel_width=1*u.km/u.s):
     """
     Plot a time-frequency waterfall of a single raw integration.
+
+    Edited by Claude -- PR #3 --
+    https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
 
     ``tuned_frequency`` is the frequency the SDR was actually tuned to when
     ``filename`` was recorded -- i.e. the band centre.  It is used as-is; do
@@ -326,6 +331,7 @@ def waterfall_plot(filename, tuned_frequency=hi_restfreq, samplerate=1e7,
     import pylab as pl
     from astropy.visualization import simple_norm
 
+    # Edited by Claude -- PR #3 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     tuned_frequency = u.Quantity(tuned_frequency, u.Hz)
     samplerate = u.Quantity(samplerate, u.Hz)
 
@@ -341,6 +347,7 @@ def waterfall_plot(filename, tuned_frequency=hi_restfreq, samplerate=1e7,
     # fft along axis=1 means that's the frequency axis
     dataft = np.fft.fftshift(np.abs(np.fft.fft(data, axis=1))**2, axes=(1,))
 
+    # Edited by Claude -- PR #3 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     # the band is centred on the tuned frequency; the frequency-switching throw
     # is already baked into `tuned_frequency` by the caller
     frequency = ((np.fft.fftshift(np.fft.fftfreq(data.shape[1])) * samplerate
@@ -348,6 +355,7 @@ def waterfall_plot(filename, tuned_frequency=hi_restfreq, samplerate=1e7,
     freqrange = (frequency.max() - frequency.min()).value
     freq0 = frequency.min().value
 
+    # Edited by Claude -- PR #3 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     total_time = (data.size / samplerate).decompose().value
 
     # Label the axes with `extent` rather than by rewriting the tick labels.
@@ -369,6 +377,7 @@ def waterfall_plot(filename, tuned_frequency=hi_restfreq, samplerate=1e7,
     pl.setp(ax.get_xticklabels(), rotation=30)
     pl.colorbar(mappable=im)
 
+    # Edited by Claude -- PR #3 -- https://claude.ai/code/session_01GgTX26kqbpZNCc4XZDrp9y
     outfilename = filename.replace(".npy", "").replace(".rx", "") + "_waterfall.png"
     pl.savefig(outfilename, bbox_inches='tight')
 
